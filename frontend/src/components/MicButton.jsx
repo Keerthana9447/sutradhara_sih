@@ -61,8 +61,8 @@ export default function MicButton({ sourceLanguage, onTranscribed, copy }) {
       recognition.onerror = (event) => {
         const messages = {
           notallowed: copy.micPermissionDenied,
-          service-not-allowed: copy.micNotSupported,
-          audio-capture: copy.micNotSupported,
+          'service-not-allowed': copy.micNotSupported,
+          'audio-capture': copy.micNotSupported,
           network: copy.micTranscribeFailed,
         }
         setErrorMsg(messages[event.error] || copy.micTranscribeFailed)

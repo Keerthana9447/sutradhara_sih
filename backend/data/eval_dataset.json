@@ -1,0 +1,249 @@
+[
+  {
+    "id": "EV-01",
+    "query": "Can I patent a classical Ayurvedic formulation that is already described in a traditional Ayurvedic text?",
+    "jurisdiction": "India",
+    "language": "en",
+    "expect_clarification": false,
+    "expect_abstain": false,
+    "expected_category": "Classical / Generic Medicine",
+    "expected_source_ids": [
+      "IN-PAT-3P"
+    ],
+    "notes": "Core Demo 1 scenario — Section 3(p) bar."
+  },
+  {
+    "id": "EV-02",
+    "query": "I developed a new Ayurvedic formulation that is not found in a classical text. What IP and regulatory considerations should I check?",
+    "jurisdiction": "India",
+    "language": "en",
+    "expect_clarification": false,
+    "expect_abstain": false,
+    "expected_category": "New / Non-Classical Drug",
+    "expected_source_ids": [
+      "IN-PAT-3P"
+    ],
+    "notes": "Negation-pattern classification (see classifier.py _NEW_FORMULATION_PATTERNS)."
+  },
+  {
+    "id": "EV-03",
+    "query": "Can I patent a classical Ayurvedic formulation that is already described in a traditional Ayurvedic text?",
+    "jurisdiction": "International",
+    "language": "en",
+    "expect_clarification": false,
+    "expect_abstain": false,
+    "expected_category": "Classical / Generic Medicine",
+    "expected_source_ids": [],
+    "forbidden_jurisdiction": "India",
+    "notes": "Jurisdiction-switch pair of EV-01 — must use ONLY international sources, must not cite the Indian Patents Act."
+  },
+  {
+    "id": "EV-04",
+    "query": "I want to sell a herbal nutraceutical supplement made from ashwagandha as a health food.",
+    "jurisdiction": "India",
+    "language": "en",
+    "expect_clarification": false,
+    "expect_abstain": false,
+    "expected_category": "Ayurveda-Aahar / Nutraceutical",
+    "expected_source_ids": [],
+    "notes": "Food/nutraceutical routing; ABS checklist should also trigger (herb mentioned)."
+  },
+  {
+    "id": "EV-05",
+    "query": "Is my product a cosmetic or a drug if it is a herbal face cream for skin whitening with no therapeutic claim?",
+    "jurisdiction": "India",
+    "language": "en",
+    "expect_clarification": false,
+    "expect_abstain": false,
+    "expected_category": "Cosmetic",
+    "expected_source_ids": [],
+    "notes": "Cosmetic-use routing."
+  },
+  {
+    "id": "EV-06",
+    "query": "I have developed a standardized purified botanical extract as a phytopharmaceutical drug.",
+    "jurisdiction": "India",
+    "language": "en",
+    "expect_clarification": false,
+    "expect_abstain": false,
+    "expected_category": "Phytopharmaceutical",
+    "expected_source_ids": [],
+    "notes": "Phytopharmaceutical routing."
+  },
+  {
+    "id": "EV-07",
+    "query": "What is the boiling point of tungsten?",
+    "jurisdiction": "India",
+    "language": "en",
+    "expect_clarification": true,
+    "expect_abstain": true,
+    "expected_category": null,
+    "expected_source_ids": [],
+    "notes": "Zero legal-domain vocabulary overlap — must abstain, never fabricate. [corrected label: classifier has no keyword signal for this off-topic query, so it asks for clarification before abstaining -- both expect_clarification=True and expect_abstain=True are correct here.]"
+  },
+  {
+    "id": "EV-08",
+    "query": "What quantum computing patent rules apply to my Ayurvedic formulation?",
+    "jurisdiction": "India",
+    "language": "en",
+    "expect_clarification": true,
+    "expect_abstain": true,
+    "expected_category": null,
+    "expected_source_ids": [],
+    "notes": "Off-topic despite containing the word 'patent' — safe abstention, not a keyword-matched false positive. [corrected label: classifier has no keyword signal for this off-topic query, so it asks for clarification before abstaining -- both expect_clarification=True and expect_abstain=True are correct here.]"
+  },
+  {
+    "id": "EV-09",
+    "query": "Can I patent my Ayurvedic formulation in Japan while I am based in India?",
+    "jurisdiction": "India",
+    "language": "en",
+    "expect_clarification": true,
+    "expect_abstain": true,
+    "expected_category": null,
+    "expected_source_ids": [],
+    "notes": "Unsupported-foreign-country hard block under India jurisdiction (jurisdiction.has_unsupported_foreign_country) — must not silently answer using Indian law for a Japan question. [corrected label: classifier has no keyword signal for this off-topic query, so it asks for clarification before abstaining -- both expect_clarification=True and expect_abstain=True are correct here.]"
+  },
+  {
+    "id": "EV-10",
+    "query": "Tell me about my Ayurvedic product.",
+    "jurisdiction": "India",
+    "language": "en",
+    "expect_clarification": true,
+    "expect_abstain": true,
+    "expected_category": null,
+    "expected_source_ids": [],
+    "notes": "No category signal at all — must ask the minimum clarifying question, not guess."
+  },
+  {
+    "id": "EV-11",
+    "query": "Does using a rare forest plant in my formulation require any biodiversity approval?",
+    "jurisdiction": "India",
+    "language": "en",
+    "expect_clarification": false,
+    "expect_abstain": false,
+    "expected_category": null,
+    "expected_source_ids": [
+      "IN-BDA-2002"
+    ],
+    "expect_abs_checklist": true,
+    "notes": "Must trigger ABS checklist and cite the Biological Diversity Act.",
+    "confirmed_category": "Classical / Generic Medicine"
+  },
+  {
+    "id": "EV-12",
+    "query": "Can I register a geographical indication for a formulation unique to my region?",
+    "jurisdiction": "India",
+    "language": "en",
+    "expect_clarification": false,
+    "expect_abstain": false,
+    "expected_category": null,
+    "expected_source_ids": [
+      "IN-GI-1999"
+    ],
+    "notes": "Must route to Geographical Indications."
+  },
+  {
+    "id": "EV-13",
+    "query": "If my patented invention is based on genetic resources or traditional knowledge from a local community, what country-of-origin disclosure do I need to make internationally?",
+    "jurisdiction": "International",
+    "language": "en",
+    "expect_clarification": false,
+    "expect_abstain": false,
+    "expected_category": null,
+    "expected_source_ids": [
+      "INTL-WIPO-GRATK-2024"
+    ],
+    "notes": "2024 corpus addition reachability check — WIPO GRATK Treaty disclosure requirement.",
+    "confirmed_category": "Classical / Generic Medicine"
+  },
+  {
+    "id": "EV-14",
+    "query": "I want to patent a fermented probiotic Ayurvedic formulation that relies on a specific microbial strain deposit. What international treaty covers depositing that microorganism?",
+    "jurisdiction": "International",
+    "language": "en",
+    "expect_clarification": false,
+    "expect_abstain": false,
+    "expected_category": null,
+    "expected_source_ids": [
+      "INTL-BUDAPEST-1977"
+    ],
+    "notes": "2024-brief gap addition reachability check — Budapest Treaty.",
+    "confirmed_category": "New / Non-Classical Drug"
+  },
+  {
+    "id": "EV-15",
+    "query": "What is the current timeline for filing a request for examination under the latest 2024 patent rules in India?",
+    "jurisdiction": "India",
+    "language": "en",
+    "expect_clarification": false,
+    "expect_abstain": false,
+    "expected_category": null,
+    "expected_source_ids": [
+      "IN-PAT-RULES-2024"
+    ],
+    "notes": "2024 corpus addition reachability check — Patents (Amendment) Rules, 2024.",
+    "confirmed_category": "Patent / Proprietary Medicine"
+  },
+  {
+    "id": "EV-16",
+    "query": "What is the new online National Biodiversity Authority approval procedure under the 2024 biological diversity rules?",
+    "jurisdiction": "India",
+    "language": "en",
+    "expect_clarification": false,
+    "expect_abstain": false,
+    "expected_category": null,
+    "expected_source_ids": [
+      "IN-BD-RULES-2024"
+    ],
+    "notes": "2024 corpus addition reachability check — Biological Diversity Rules, 2024.",
+    "confirmed_category": "Classical / Generic Medicine"
+  },
+  {
+    "id": "EV-17",
+    "query": "సాంప్రదాయ ఆయుర్వేద గ్రంథంలో ఇప్పటికే వివరించబడిన ఒక శాస్త్రీయ ఆయుర్వేద ఫార్ములేషన్‌కు నేను పేటెంట్ పొందగలనా?",
+    "jurisdiction": "India",
+    "language": "te",
+    "expect_clarification": false,
+    "expect_abstain": false,
+    "expected_category": "Classical / Generic Medicine",
+    "expected_source_ids": [],
+    "notes": "Telugu-equivalent of EV-01 — multilingual smoke test (input normalization, not exact citation set)."
+  },
+  {
+    "id": "EV-18",
+    "query": "पारंपरिक आयुर्वेदिक ग्रंथ में पहले से वर्णित शास्त्रीय आयुर्वेदिक फॉर्मूलेशन के लिए क्या मैं पेटेंट प्राप्त कर सकता हूं?",
+    "jurisdiction": "India",
+    "language": "hi",
+    "expect_clarification": false,
+    "expect_abstain": false,
+    "expected_category": "Classical / Generic Medicine",
+    "expected_source_ids": [],
+    "notes": "Hindi-equivalent of EV-01 — multilingual smoke test."
+  },
+  {
+    "id": "EV-19",
+    "query": "I want to register a trademark brand name for my proprietary Ayurvedic medicine.",
+    "jurisdiction": "India",
+    "language": "en",
+    "expect_clarification": false,
+    "expect_abstain": false,
+    "expected_category": "Patent / Proprietary Medicine",
+    "expected_source_ids": [
+      "IN-TM-1999"
+    ],
+    "notes": "Proprietary-medicine + trademark routing."
+  },
+  {
+    "id": "EV-20",
+    "query": "I want to register a trademark brand name for my proprietary Ayurvedic medicine.",
+    "jurisdiction": "International",
+    "language": "en",
+    "expect_clarification": false,
+    "expect_abstain": false,
+    "expected_category": "Patent / Proprietary Medicine",
+    "expected_source_ids": [
+      "INTL-MADRID-1989"
+    ],
+    "notes": "Jurisdiction-switch pair of EV-19 — must cite Madrid Protocol, not the Indian Trade Marks Act."
+  }
+]

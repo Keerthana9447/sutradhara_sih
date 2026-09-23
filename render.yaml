@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: sutradhara-backend
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    envVars:
+      - key: CORS_ORIGINS
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_MODEL
+        value: llama-3.1-8b-instant
+      - key: ENABLE_LLM_PARAPHRASE
+        value: "false"
+      - key: GROQ_TIMEOUT_SECONDS
+        value: "8"
+      - key: BHASHINI_NMT_USER_ID
+        sync: false
+      - key: BHASHINI_NMT_API_KEY
+        sync: false
+      - key: SARVAM_API_KEY
+        sync: false

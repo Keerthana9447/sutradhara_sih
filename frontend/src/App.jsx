@@ -182,7 +182,7 @@ export default function App() {
             className="pointer-events-none absolute -left-8 -bottom-12 text-gold-light opacity-[0.08]"
           />
 
-          <div className="relative max-w-6xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between flex-wrap gap-4">
+          <div className="relative max-w-6xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between flex-wrap gap-4 header-inner">
             <div className="flex items-center gap-3">
               <span className="inline-flex items-center justify-center w-10 h-10 rounded-lg border border-gold-light/35 bg-paper/10 text-gold-light shrink-0 shadow-inner">
                 <Logo size={22} />
@@ -200,7 +200,7 @@ export default function App() {
             </div>
 
             <div className="flex items-center gap-3">
-              <div className="inline-flex border border-paper/25 rounded-md overflow-hidden bg-green-dark/25">
+              <div className="lang-scroll border border-paper/25 rounded-md overflow-hidden bg-green-dark/25">
                 {[
                   ['en', copy.languageEnglish],
                   ['te', copy.languageTelugu],
@@ -239,7 +239,7 @@ export default function App() {
           </div>
 
           <nav
-            className="relative max-w-6xl mx-auto px-4 sm:px-6 flex gap-1 text-sm overflow-x-auto"
+            className="relative max-w-6xl mx-auto px-4 sm:px-6 flex gap-1 text-sm overflow-x-auto nav-tabs"
             aria-label={copy.primaryNavigation}
           >
             {NAV.map((t) => {
@@ -276,7 +276,7 @@ export default function App() {
           </div>
         </header>
 
-        <main className="flex-1 w-full max-w-6xl mx-auto px-4 sm:px-6 py-8 lg:py-10">
+        <main className="flex-1 w-full max-w-6xl mx-auto px-4 sm:px-6 py-8 lg:py-10 mobile-py">
           <div key={tab} className="view-enter">
             {tab === 'graph' && (
               <KnowledgeGraphView

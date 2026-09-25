@@ -43,6 +43,13 @@ html, body {
   min-width: 320px;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  -webkit-text-size-adjust: 100%;
+}
+
+/* Better tap behaviour on mobile — removes 300ms delay without
+   disabling pinch-to-zoom (touch-action: manipulation). */
+button, a, [role='button'], input, textarea, select {
+  touch-action: manipulation;
 }
 
 /* Manuscript ground: laid-paper ruling, a faint vertical chain line, and a
@@ -592,6 +599,94 @@ select:focus-visible, a:focus-visible, [tabindex]:focus-visible {
   .thread { padding: 1.25rem; }
   .eval-empty-dashboard { gap: 1.5rem; }
   .tool-empty { flex-direction: column; align-items: flex-start; }
+}
+
+/* --------------------------------------------------------------------------
+   Mobile responsive overrides
+   -------------------------------------------------------------------------- */
+
+/* === Header & language selector === */
+@media (max-width: 480px) {
+  /* Stack header: branding on top, language bar below */
+  .header-inner { flex-direction: column; align-items: stretch !important; gap: 0.5rem; }
+  .header-inner > div:first-child { justify-content: center; }
+}
+
+/* Language selector: always horizontally scrollable on small screens */
+.lang-scroll {
+  display: flex;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;          /* Firefox */
+  -ms-overflow-style: none;       /* IE/Edge */
+}
+.lang-scroll::-webkit-scrollbar { display: none; }
+
+/* Ensure each language button has a comfortable tap target */
+@media (max-width: 640px) {
+  .lang-scroll button { min-width: 44px; min-height: 36px; font-size: 0.7rem; padding: 0.4rem 0.55rem; }
+}
+
+/* === Navigation tabs === */
+@media (max-width: 640px) {
+  .nav-tabs { gap: 0; }
+  .nav-tabs button { font-size: 0.72rem; padding: 0.55rem 0.5rem; gap: 0.3rem; }
+  .nav-tabs button svg { width: 12px; height: 12px; }
+}
+
+/* Scrollbar fade-hint: a subtle gradient so the user notices
+   horizontal scroll is available. */
+.scroll-hint {
+  position: relative;
+}
+.scroll-hint::after {
+  content: '';
+  position: absolute;
+  right: 0; top: 0; bottom: 0;
+  width: 24px;
+  background: linear-gradient(270deg, var(--green-deepest), transparent);
+  pointer-events: none;
+  border-radius: 0 6px 6px 0;
+}
+
+/* === Hero section === */
+@media (max-width: 480px) {
+  .hero-title { font-size: 2.4rem !important; }
+  .hero-lede { font-size: 0.9rem !important; }
+}
+
+/* === Confidence breakdown factors === */
+@media (max-width: 480px) {
+  .confidence-factor-label { width: auto !important; min-width: 90px; flex-shrink: 1 !important; }
+  .confidence-factor-row { flex-wrap: wrap; gap: 0.3rem !important; }
+}
+
+/* === Knowledge graph === */
+.graph-scroll-container {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.graph-scroll-container::-webkit-scrollbar { height: 6px; }
+.graph-scroll-container::-webkit-scrollbar-thumb { background: #466652; border-radius: 4px; }
+
+/* === Eval metric cards === */
+@media (max-width: 480px) {
+  .eval-metric-card { padding: 0.75rem; }
+  .eval-metric-card .font-serif { font-size: 1.75rem; }
+}
+
+/* === General mobile fixes === */
+@media (max-width: 640px) {
+  /* Make sure long text in result panels doesn't overflow */
+  .max-w-\[72ch\] { max-width: 100%; }
+  .max-w-\[70ch\] { max-width: 100%; }
+  .max-w-\[68ch\] { max-width: 100%; }
+
+  /* Tool surface: reduce left border accent padding for mobile */
+  .tool-surface { padding-left: 0.75rem; border-left-width: 3px; }
+
+  /* Reduce main content vertical padding */
+  .mobile-py { padding-top: 1.25rem; padding-bottom: 1.25rem; }
 }
 
 /* --------------------------------------------------------------------------

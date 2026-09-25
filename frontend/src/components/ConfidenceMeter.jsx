@@ -54,8 +54,8 @@ export default function ConfidenceMeter({ confidence, label, breakdown, copy }) 
       {breakdown && Object.keys(breakdown).length > 0 && (
         <dl className="mt-5 space-y-2.5">
           {Object.entries(breakdown).map(([k, v], i) => (
-            <div key={k} className="flex items-center gap-3">
-              <dt className="text-xs text-ink/60 w-44 shrink-0">{copy?.confidenceFactors?.[k] || FACTOR_LABELS[k] || k.replaceAll('_', ' ')}</dt>
+            <div key={k} className="flex items-center gap-3 confidence-factor-row">
+              <dt className="text-xs text-ink/60 w-44 shrink-0 confidence-factor-label">{copy?.confidenceFactors?.[k] || FACTOR_LABELS[k] || k.replaceAll('_', ' ')}</dt>
               <div className="flex-1 h-1.5 bg-hairline/50 rounded-full overflow-hidden">
                 <div
                   className="h-full bg-green-mid/75 rounded-full transition-[width] duration-700 ease-out"

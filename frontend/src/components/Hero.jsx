@@ -24,8 +24,8 @@ export default function Hero({ copy, onStart }) {
         <LeafSprig size={112} flip className="pointer-events-none absolute -right-12 top-24 text-green opacity-[0.09] hidden lg:block" />
 
         <p className="section-kicker mb-5">{copy.tagline}</p>
-        <h1 className="relative font-serif text-5xl sm:text-6xl text-green-dark tracking-tight leading-[0.98]">{copy.appName}</h1>
-        <p className="relative mt-6 text-base sm:text-lg text-ink/65 leading-relaxed max-w-2xl mx-auto">{copy.heroLede}</p>
+        <h1 className="relative font-serif text-5xl sm:text-6xl text-green-dark tracking-tight leading-[0.98] hero-title">{copy.appName}</h1>
+        <p className="relative mt-6 text-base sm:text-lg text-ink/65 leading-relaxed max-w-2xl mx-auto hero-lede">{copy.heroLede}</p>
         <div className="relative mt-8 flex flex-col items-center gap-3">
           <button
             onClick={onStart}

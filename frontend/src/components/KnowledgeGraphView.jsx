@@ -182,7 +182,7 @@ export default function KnowledgeGraphView({ copy, defaultCategory, defaultJuris
           </div>
           <p className="text-xs text-paper/65 mb-5 max-w-xl">{graph.note}</p>
 
-          <div className="overflow-x-auto -mx-2 px-2">
+          <div className="overflow-x-auto -mx-2 px-2 graph-scroll-container">
             <svg viewBox={`0 0 ${layout.width} ${layout.height}`} className="w-full h-auto min-w-[640px] drop-shadow-[0_6px_8px_rgba(20,42,31,0.08)]">
               <defs>
                 <marker id="graph-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">

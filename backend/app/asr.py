@@ -4,15 +4,15 @@ Speech-to-text and text-to-speech.
 PROVIDER CHAIN — same shape for both directions, and deliberately kept
 consistent with app/translate.py's answer-translation chain:
 
-  1. Sarvam AI (Saaras v3 for STT, Bulbul v3 for TTS) — tried first for
-     both. Already the project's primary voice provider; SARVAM_API_KEY is
-     shared with app/translate.py's translation use of the same SDK/key.
-  2. Bhashini (ULCA pipeline API — taskType "asr" for transcribe(),
-     taskType "tts" for synthesize()) — fallback if Sarvam is unconfigured
-     or the call fails. Two live HTTP calls per request either way, same
-     shape as the translation pipeline: (a) getModelsPipeline to resolve
+  1. Bhashini (ULCA pipeline API — taskType "asr" for transcribe(),
+     taskType "tts" for synthesize()) — tried first as primary, per the
+     problem statement's explicit priority for national language infrastructure.
+     Two live HTTP calls per request: (a) getModelsPipeline to resolve
      the serviceId + inference endpoint for the requested language and
      task, (b) the inference call itself.
+  2. Sarvam AI (Saaras v3 for STT, Bulbul v3 for TTS) — fallback if
+     Bhashini is unconfigured or the call fails. Authenticated API
+     purpose-built for Indian languages, requires SARVAM_API_KEY.
 
      Bhashini's ASR models are generally trained on WAV/FLAC PCM audio;
      the browser's MediaRecorder (frontend MicButton fallback, when wired
@@ -23,10 +23,10 @@ consistent with app/translate.py's answer-translation chain:
      frontend-side re-encode, not something this module can fix after the
      fact. Documented here rather than silently assumed to work; the
      function still fails safe (returns None) rather than raising if the
-     format is rejected, same contract as every other provider in both
-     this module and translate.py. Bhashini TTS returns WAV audio
-     regardless of input, so synthesize()'s output contract (base64 WAV)
-     is unchanged whichever provider actually served the request.
+     format is rejected, falling back to Sarvam or failing safe. Bhashini
+     TTS returns WAV audio regardless of input, so synthesize()'s output
+     contract (base64 WAV) is unchanged whichever provider actually served
+     the request.
 
   Credentials — three tiers, checked in this order, same pattern as
   translate.py's BHASHINI_NMT_USER_ID / BHASHINI_NMT_API_KEY fallback:
@@ -69,7 +69,7 @@ except ImportError:
 logger = logging.getLogger("ip_sakti.asr")
 
 SUPPORTED_ASR_LANGUAGES = ("en", "hi", "te", "ta", "ml")
-_LANGUAGE_CODES = {"en": "en-IN", "hi": "hi-IN", "te": "te-IN", "ta": "ta-IN", "ml": "ml-IN"}
+_LANGUAGE_CODES = {"en": "en-IN", "hi": "hi-IN", "te": "te-IN", "ta": "ta-IN", "ml": "ml-IN", "sa": "hi-IN"}
 
 
 def _sarvam_client() -> Optional[object]:
@@ -80,8 +80,8 @@ def _sarvam_client() -> Optional[object]:
 
 
 def asr_status() -> dict:
-    """Report whether Sarvam SDK and credentials are available. See
-    bhashini_asr_status() below for the fallback provider's own check —
+    """Report whether Sarvam SDK and credentials are available for fallback.
+    See bhashini_asr_status() below for the primary provider's check —
     kept as a separate function (rather than folded into this one) so
     /api/health can show both independently, same pattern as
     translate.sarvam_translate_status() / translate.bhashini_status()."""
@@ -90,9 +90,9 @@ def asr_status() -> dict:
         "configured": configured,
         "provider": "sarvam",
         "note": (
-            "Sarvam Saaras speech-to-text and Bulbul text-to-speech are configured."
+            "Sarvam Saaras speech-to-text and Bulbul text-to-speech are configured as fallback."
             if configured
-            else "Set SARVAM_API_KEY in the environment."
+            else "Set SARVAM_API_KEY in the environment for fallback ASR/TTS."
         ),
     }
 
@@ -151,7 +151,7 @@ def _bhashini_asr_credentials() -> Optional[tuple[str, str]]:
 
 def bhashini_asr_status() -> dict:
     """Small transparency helper for /api/health — reports whether the
-    Bhashini ASR fallback is actually usable in this deployment, without
+    Bhashini ASR provider is actually usable in this deployment, without
     leaking the credential values themselves. See asr_status() above and
     translate.bhashini_status() for the sibling credential checks."""
     configured = _bhashini_asr_credentials() is not None and _HTTPX_AVAILABLE
@@ -161,12 +161,12 @@ def bhashini_asr_status() -> dict:
         "note": (
             "BHASHINI_ASR_USER_ID / BHASHINI_ASR_API_KEY (or the shared "
             "BHASHINI_USER_ID / BHASHINI_API_KEY) set — Bhashini ASR is "
-            "tried if Sarvam speech-to-text is unavailable."
+            "the primary speech-to-text provider."
             if configured
             else "Not configured in this environment — voice input falls "
-            "back to Sarvam only. Set BHASHINI_ASR_USER_ID and "
+            "back to Sarvam. Set BHASHINI_ASR_USER_ID and "
             "BHASHINI_ASR_API_KEY (or the shared BHASHINI_USER_ID / "
-            "BHASHINI_API_KEY) to enable the Bhashini ASR fallback."
+            "BHASHINI_API_KEY) to enable Bhashini as primary ASR."
         ),
     }
 
@@ -247,19 +247,19 @@ def _transcribe_via_bhashini(
 
 
 def synthesize(text: str, language: str = "en", speaker: str = "shubh") -> Optional[str]:
-    """Return base64-encoded WAV audio. Tries Sarvam Bulbul v3 first, then
-    falls back to Bhashini TTS if Sarvam is unconfigured or fails — see the
+    """Return base64-encoded WAV audio. Tries Bhashini TTS first as primary, then
+    falls back to Sarvam Bulbul v3 if Bhashini is unconfigured or fails — see the
     module docstring for the full chain. ``speaker`` is Sarvam-specific
-    (voice name, e.g. "shubh") and has no effect on the Bhashini fallback,
+    (voice name, e.g. "shubh") and has no effect on the Bhashini provider,
     which instead picks a gender via _BHASHINI_TTS_GENDER."""
-    if not text.strip() or len(text) > 2500:
+    if not text.strip() or len(text) > 6000:
         return None
 
-    audio = _synthesize_via_sarvam(text, language, speaker)
+    audio = _synthesize_via_bhashini(text, language)
     if audio:
         return audio
 
-    return _synthesize_via_bhashini(text, language)
+    return _synthesize_via_sarvam(text, language, speaker)
 
 
 def _synthesize_via_sarvam(text: str, language: str, speaker: str) -> Optional[str]:
@@ -278,7 +278,7 @@ def _synthesize_via_sarvam(text: str, language: str, speaker: str) -> Optional[s
 
 
 # --------------------------------------------------------------------------
-# Bhashini (ULCA) TTS fallback
+# Bhashini (ULCA) TTS provider
 # --------------------------------------------------------------------------
 _BHASHINI_DEFAULT_TTS_PIPELINE_ID = _BHASHINI_DEFAULT_ASR_PIPELINE_ID  # same multi-task pipeline resource
 _BHASHINI_TTS_GENDER = "female"  # Bhashini TTS voices are selected by gender, not a named speaker like Sarvam's
@@ -308,7 +308,7 @@ def _bhashini_tts_credentials() -> Optional[tuple[str, str]]:
 
 def bhashini_tts_status() -> dict:
     """Small transparency helper for /api/health — reports whether the
-    Bhashini TTS fallback is actually usable in this deployment, without
+    Bhashini TTS provider is actually usable in this deployment, without
     leaking the credential values themselves. See bhashini_asr_status()
     above and translate.bhashini_status() for the sibling credential
     checks."""
@@ -319,12 +319,12 @@ def bhashini_tts_status() -> dict:
         "note": (
             "BHASHINI_TTS_USER_ID / BHASHINI_TTS_API_KEY (or the shared "
             "BHASHINI_ASR_* / BHASHINI_* credentials) set — Bhashini TTS is "
-            "tried if Sarvam Read Aloud is unavailable."
+            "the primary text-to-speech provider."
             if configured
             else "Not configured in this environment — Read Aloud falls "
-            "back to Sarvam only. Set BHASHINI_TTS_USER_ID and "
+            "back to Sarvam. Set BHASHINI_TTS_USER_ID and "
             "BHASHINI_TTS_API_KEY (or reuse the BHASHINI_ASR_* / shared "
-            "BHASHINI_* credentials) to enable the Bhashini TTS fallback."
+            "BHASHINI_* credentials) to enable Bhashini as primary TTS."
         ),
     }
 
@@ -346,6 +346,10 @@ def _synthesize_via_bhashini(text: str, language: str) -> Optional[str]:
         "BHASHINI_TTS_PIPELINE_ID",
         os.getenv("BHASHINI_PIPELINE_ID", _BHASHINI_DEFAULT_TTS_PIPELINE_ID),
     )
+    # Bhashini pipeline routes Sanskrit (Devanagari script) under the
+    # Indo-Aryan/Devanagari model ('hi').
+    bhashini_lang = "hi" if language == "sa" else language
+
     headers = {
         "Content-Type": "application/json",
         "userID": user_id,
@@ -355,7 +359,7 @@ def _synthesize_via_bhashini(text: str, language: str) -> Optional[str]:
         "pipelineTasks": [
             {
                 "taskType": "tts",
-                "config": {"language": {"sourceLanguage": language}},
+                "config": {"language": {"sourceLanguage": bhashini_lang}},
             }
         ],
         "pipelineRequestConfig": {"pipelineId": pipeline_id},
@@ -378,7 +382,7 @@ def _synthesize_via_bhashini(text: str, language: str) -> Optional[str]:
                     {
                         "taskType": "tts",
                         "config": {
-                            "language": {"sourceLanguage": language},
+                            "language": {"sourceLanguage": bhashini_lang},
                             "serviceId": service_id,
                             "gender": _BHASHINI_TTS_GENDER,
                             "samplingRate": _BHASHINI_TTS_SAMPLING_RATE,
@@ -404,8 +408,8 @@ def _synthesize_via_bhashini(text: str, language: str) -> Optional[str]:
 def transcribe(audio_base64: str, source_language: str = "en",
                audio_format: str = "wav", sampling_rate: int = 16000) -> tuple[str, bool]:
     """Return ``(transcript, success)`` without raising into the API handler.
-    Tries Sarvam first, then falls back to Bhashini ASR if Sarvam is
-    unconfigured or fails — see the module docstring for the full chain."""
+    Tries Bhashini ASR first as primary, then falls back to Sarvam Saaras
+    if Bhashini is unconfigured or fails — see the module docstring for the full chain."""
     if source_language not in SUPPORTED_ASR_LANGUAGES:
         return (
             f"Voice input isn't supported for language '{source_language}' yet.",
@@ -415,16 +419,16 @@ def transcribe(audio_base64: str, source_language: str = "en",
     if not audio_base64 or not audio_base64.strip():
         return "No audio received.", False
 
-    transcript = _transcribe_via_sarvam(audio_base64, audio_format)
-    if transcript:
-        return transcript, True
-
     transcript = _transcribe_via_bhashini(audio_base64, source_language, audio_format, sampling_rate)
     if transcript:
         return transcript, True
 
+    transcript = _transcribe_via_sarvam(audio_base64, audio_format)
+    if transcript:
+        return transcript, True
+
     return (
-        "Couldn't transcribe that — Sarvam and Bhashini speech-to-text are both "
+        "Couldn't transcribe that — Bhashini and Sarvam speech-to-text are both "
         "unavailable or unconfigured in this environment. You can type your "
         "question instead.",
         False,

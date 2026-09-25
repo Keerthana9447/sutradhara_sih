@@ -18,37 +18,16 @@ Deliberately NOT translated:
 
 PROVIDER CHAIN: the problem statement asks for multilingual delivery
 "leveraging national language infrastructure such as Bhashini" — the
-Government of India's public MeitY/ULCA language pipeline — but on a shared
-Render IP, the two free scrape-based fallbacks (Google/MyMemory) get
-throttled quickly, and the Bhashini ULCA endpoint is not always reachable
-from every hosting network. So the chain now tries, in order:
+Government of India's public MeitY/ULCA language pipeline. The chain tries, in order:
 
-  1. Sarvam AI (sarvam-translate:v1) — tried first. The project already
-     depends on the sarvamai SDK and an authenticated SARVAM_API_KEY for
-     ASR/TTS (app/asr.py), so this provider needs no extra credentials,
-     is purpose-built for Indian languages, supports all 22 scheduled
-     languages including Telugu, and is a paid/authenticated API rather
-     than a rate-limited scrape — the most reliable option on a shared
-     hosting IP. Only added to the chain when SARVAM_API_KEY is set.
-  2. Bhashini (ULCA pipeline API) — tried next, per the PS's own explicit
-     wording about national language infrastructure. Requires
-     BHASHINI_NMT_USER_ID and BHASHINI_NMT_API_KEY (a free registration at
-     https://bhashini.gov.in / the ULCA developer portal). Translation
-     credentials are independent from speech recognition, which uses
-     Sarvam Saaras in app/asr.py. For backward compatibility, the older
-     unprefixed BHASHINI_USER_ID / BHASHINI_API_KEY names are still read as
-     a fallback if the NMT-specific ones aren't set. Two live HTTP calls
-     per translation: (a) getModelsPipeline to resolve the actual
-     inference endpoint + per-call inferenceApiKey for the requested
-     language pair, (b) the inference call itself against that endpoint.
-     This project's own build/CI sandbox has no route to
-     meity-auth.ulcacontrib.org (an egress-restricted network, same as it
-     has none to the Hugging Face Hub for the embeddings backend — see
-     retrieval.py), so this path is implemented and unit-tested against a
-     mocked HTTP layer here, but has not been exercised against the live
-     Bhashini service.
-  3. Google Translate (via deep-translator, free/no key) — used if Sarvam
-     and Bhashini are both unconfigured, unreachable, or error.
+  1. Bhashini (ULCA pipeline API) — tried first as primary, per the PS's
+     explicit priority for national language infrastructure. Requires
+     BHASHINI_NMT_USER_ID and BHASHINI_NMT_API_KEY (or the shared
+     BHASHINI_USER_ID / BHASHINI_API_KEY).
+  2. Sarvam AI (sarvam-translate:v1) — fallback provider. Authenticated
+     API purpose-built for Indian languages, requires SARVAM_API_KEY.
+  3. Google Translate (via deep-translator, free/no key) — used if Bhashini
+     and Sarvam are both unconfigured, unreachable, or error.
   4. MyMemory (via deep-translator) — last free fallback.
 
 Google and MyMemory are both live network calls, and both are
@@ -158,12 +137,12 @@ def sarvam_translate_status() -> dict:
     return {
         "configured": configured,
         "note": (
-            "SARVAM_API_KEY set — Sarvam (sarvam-translate:v1) is the "
-            "first translation provider tried."
+            "SARVAM_API_KEY set — Sarvam (sarvam-translate:v1) is available "
+            "as fallback translation provider if Bhashini is unavailable."
             if configured
             else "Not configured in this environment — falling back to "
-            "Bhashini / Google Translate / MyMemory. Set SARVAM_API_KEY "
-            "to enable Sarvam as the first translation provider."
+            "Google Translate / MyMemory if Bhashini is also unavailable. Set SARVAM_API_KEY "
+            "to enable Sarvam as fallback translation provider."
         ),
     }
 
@@ -411,19 +390,8 @@ def _translate_with_fallback_providers(text: str, source: str, target: str) -> O
 
     providers: List[Tuple[str, Callable[[str], Optional[str]], int]] = []
 
-    # Sarvam first: the SDK and key are already in place for ASR/TTS, it's
-    # an authenticated API rather than a rate-limited scrape, and it's
-    # purpose-built for Indian languages. Only added when actually usable,
-    # same reasoning as the Bhashini/free-provider guards below.
-    if _SARVAM_AVAILABLE and _sarvam_api_key():
-        providers.append((
-            "sarvam",
-            lambda t: _sarvam_translate_one(t, source, target),
-            _PROVIDER_MAX_CHARS["sarvam"],
-        ))
-
-    # Bhashini next, per the problem statement's explicit preference for
-    # national language infrastructure. Only added to the chain when
+    # Bhashini first (primary), per the problem statement's explicit preference
+    # for national language infrastructure. Only added to the chain when
     # credentials are configured — otherwise _bhashini_translate_one would
     # just return None on every chunk, so skip it outright to avoid a
     # pointless network attempt per chunk.
@@ -432,6 +400,15 @@ def _translate_with_fallback_providers(text: str, source: str, target: str) -> O
             "bhashini",
             lambda t: _bhashini_translate_one(t, source, target),
             _PROVIDER_MAX_CHARS["bhashini"],
+        ))
+
+    # Sarvam next (fallback): authenticated Indian language translation API.
+    # Only added when SARVAM_API_KEY is configured.
+    if _SARVAM_AVAILABLE and _sarvam_api_key():
+        providers.append((
+            "sarvam",
+            lambda t: _sarvam_translate_one(t, source, target),
+            _PROVIDER_MAX_CHARS["sarvam"],
         ))
 
     if _AVAILABLE:
@@ -481,12 +458,12 @@ def bhashini_status() -> dict:
         "configured": configured,
         "note": (
             "BHASHINI_NMT_USER_ID / BHASHINI_NMT_API_KEY set — Bhashini is "
-            "tried if Sarvam is unavailable."
+            "the primary translation provider."
             if configured
             else "Not configured in this environment — falling back to "
-            "Google Translate / MyMemory if Sarvam is also unavailable. Set "
+            "Sarvam / Google Translate / MyMemory. Set "
             "BHASHINI_NMT_USER_ID and BHASHINI_NMT_API_KEY to enable the "
-            "Bhashini (ULCA) NMT provider."
+            "Bhashini (ULCA) NMT provider as primary."
         ),
     }
 

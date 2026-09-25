@@ -57,6 +57,8 @@ def health():
         "sarvam_translate": translate.sarvam_translate_status(),
         "bhashini": translate.bhashini_status(),
         "sarvam_voice": asr.asr_status(),
+        "bhashini_voice": asr.bhashini_asr_status(),
+        "bhashini_tts": asr.bhashini_tts_status(),
     }
 
 

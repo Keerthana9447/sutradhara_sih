@@ -23,5 +23,13 @@ services:
         sync: false
       - key: BHASHINI_NMT_API_KEY
         sync: false
+      - key: BHASHINI_ASR_USER_ID
+        sync: false
+      - key: BHASHINI_ASR_API_KEY
+        sync: false
+      - key: BHASHINI_TTS_USER_ID
+        sync: false
+      - key: BHASHINI_TTS_API_KEY
+        sync: false
       - key: SARVAM_API_KEY
         sync: false

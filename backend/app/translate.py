@@ -16,20 +16,29 @@ Deliberately NOT translated:
   - The corpus.json content itself — corpus stays English/source-language;
     only the assembled answer is translated per-request.
 
-PROVIDER CHAIN: the problem statement specifically asks for multilingual
-delivery "leveraging national language infrastructure such as Bhashini" —
-the Government of India's public MeitY/ULCA language pipeline — rather than
-a generic commercial translation API. So the chain now tries, in order:
+PROVIDER CHAIN: the problem statement asks for multilingual delivery
+"leveraging national language infrastructure such as Bhashini" — the
+Government of India's public MeitY/ULCA language pipeline — but on a shared
+Render IP, the two free scrape-based fallbacks (Google/MyMemory) get
+throttled quickly, and the Bhashini ULCA endpoint is not always reachable
+from every hosting network. So the chain now tries, in order:
 
-  1. Bhashini (ULCA pipeline API) — tried first per the PS's own wording.
-     Requires BHASHINI_NMT_USER_ID and BHASHINI_NMT_API_KEY (a free
-     registration at https://bhashini.gov.in / the ULCA developer portal).
-    Translation credentials are independent from speech recognition, which
-    uses Google Cloud Speech-to-Text in app/asr.py. For backward compatibility, the
-    older unprefixed BHASHINI_USER_ID / BHASHINI_API_KEY names are still
-     older unprefixed BHASHINI_USER_ID / BHASHINI_API_KEY names are still
-     read as a fallback if the NMT-specific ones aren't set. Two live HTTP
-     calls per translation: (a) getModelsPipeline to resolve the actual
+  1. Sarvam AI (sarvam-translate:v1) — tried first. The project already
+     depends on the sarvamai SDK and an authenticated SARVAM_API_KEY for
+     ASR/TTS (app/asr.py), so this provider needs no extra credentials,
+     is purpose-built for Indian languages, supports all 22 scheduled
+     languages including Telugu, and is a paid/authenticated API rather
+     than a rate-limited scrape — the most reliable option on a shared
+     hosting IP. Only added to the chain when SARVAM_API_KEY is set.
+  2. Bhashini (ULCA pipeline API) — tried next, per the PS's own explicit
+     wording about national language infrastructure. Requires
+     BHASHINI_NMT_USER_ID and BHASHINI_NMT_API_KEY (a free registration at
+     https://bhashini.gov.in / the ULCA developer portal). Translation
+     credentials are independent from speech recognition, which uses
+     Sarvam Saaras in app/asr.py. For backward compatibility, the older
+     unprefixed BHASHINI_USER_ID / BHASHINI_API_KEY names are still read as
+     a fallback if the NMT-specific ones aren't set. Two live HTTP calls
+     per translation: (a) getModelsPipeline to resolve the actual
      inference endpoint + per-call inferenceApiKey for the requested
      language pair, (b) the inference call itself against that endpoint.
      This project's own build/CI sandbox has no route to
@@ -37,12 +46,10 @@ a generic commercial translation API. So the chain now tries, in order:
      has none to the Hugging Face Hub for the embeddings backend — see
      retrieval.py), so this path is implemented and unit-tested against a
      mocked HTTP layer here, but has not been exercised against the live
-     Bhashini service. Wire in real credentials in a network-open
-     environment and it should work unchanged; if it errors for any reason
-     the chain below still guarantees a translated answer.
-  2. Google Translate (via deep-translator, free/no key) — used if Bhashini
-     is unconfigured, unreachable, or errors.
-  3. MyMemory (via deep-translator) — second free fallback.
+     Bhashini service.
+  3. Google Translate (via deep-translator, free/no key) — used if Sarvam
+     and Bhashini are both unconfigured, unreachable, or error.
+  4. MyMemory (via deep-translator) — last free fallback.
 
 Google and MyMemory are both live network calls, and both are
 unofficial/rate-limited free services (Google's especially so — it's a
@@ -78,7 +85,88 @@ try:
 except ImportError:
     _HTTPX_AVAILABLE = False
 
+try:
+    from sarvamai import SarvamAI
+    _SARVAM_AVAILABLE = True
+except ImportError:
+    _SARVAM_AVAILABLE = False
+
 logger = logging.getLogger("ip_sakti.translate")
+
+# --------------------------------------------------------------------------
+# Sarvam AI provider
+# --------------------------------------------------------------------------
+# Internal short codes -> Sarvam locale codes (en-IN, te-IN, ...). Sarvam's
+# translate API wants a full locale rather than the bare ISO code Google
+# uses, so this needs its own map (same reasoning as _MYMEMORY_LANG_MAP
+# below for MyMemory).
+_SARVAM_LANG_MAP = {
+    "en": "en-IN",
+    "hi": "hi-IN",
+    "te": "te-IN",
+    "ta": "ta-IN",
+    "ml": "ml-IN",
+    "sa": "sa-IN",
+}
+
+
+def _sarvam_api_key() -> str:
+    return os.getenv("SARVAM_API_KEY", "").strip()
+
+
+def _sarvam_translate_one(text: str, source: str, target: str) -> Optional[str]:
+    """
+    One Sarvam sarvam-translate:v1 call for a single chunk of text. Returns
+    None (never raises) on any failure — missing key, SDK not installed,
+    network error, or an unexpected response shape — so the caller can fall
+    through to the next provider unconditionally, same contract as
+    _bhashini_translate_one below.
+    """
+    if not _SARVAM_AVAILABLE:
+        return None
+    api_key = _sarvam_api_key()
+    if not api_key:
+        return None
+    src_code = _SARVAM_LANG_MAP.get(source, f"{source}-IN")
+    tgt_code = _SARVAM_LANG_MAP.get(target, f"{target}-IN")
+    try:
+        client = SarvamAI(api_subscription_key=api_key)
+        response = client.text.translate(
+            input=text,
+            source_language_code=src_code,
+            target_language_code=tgt_code,
+            model="sarvam-translate:v1",
+        )
+        result = getattr(response, "translated_text", None)
+        if not result and isinstance(response, dict):
+            # Older/alternate SDK versions may return a plain dict instead
+            # of a typed response object.
+            result = response.get("translated_text")
+        return result or None
+    except Exception as e:
+        logger.info("Sarvam translation provider failed (%s->%s): %r", source, target, e)
+        return None
+
+
+def sarvam_translate_status() -> dict:
+    """Small transparency helper for /api/health and the eval dashboard —
+    reports whether the Sarvam translation provider is actually usable in
+    this deployment, without leaking the credential value itself. See
+    bhashini_status() below and app/asr.py's asr_status() for the sibling
+    ASR (voice) credential check — SARVAM_API_KEY is shared across both."""
+    configured = _SARVAM_AVAILABLE and bool(_sarvam_api_key())
+    return {
+        "configured": configured,
+        "note": (
+            "SARVAM_API_KEY set — Sarvam (sarvam-translate:v1) is the "
+            "first translation provider tried."
+            if configured
+            else "Not configured in this environment — falling back to "
+            "Bhashini / Google Translate / MyMemory. Set SARVAM_API_KEY "
+            "to enable Sarvam as the first translation provider."
+        ),
+    }
+
 
 # --------------------------------------------------------------------------
 # Bhashini (ULCA) provider
@@ -170,11 +258,11 @@ def _bhashini_translate_one(text: str, source: str, target: str) -> Optional[str
 
 # The same demo queries get re-run repeatedly during rehearsal and again
 # live in front of judges (Demo 4's exact script, retries after a
-# transient failure, a judge asking the same question twice). Both free
-# providers are rate-limited independent of this app's own logic, so
-# memoizing identical (text, source, target) calls for the life of the
-# process meaningfully cuts real request volume without changing any
-# translation *behavior* -- a cache hit returns exactly what a fresh
+# transient failure, a judge asking the same question twice). All
+# providers here are rate-limited or metered independent of this app's own
+# logic, so memoizing identical (text, source, target) calls for the life
+# of the process meaningfully cuts real request volume without changing
+# any translation *behavior* -- a cache hit returns exactly what a fresh
 # successful call would have returned. Bounded (simple FIFO eviction via
 # OrderedDict) so a long-running demo process can't grow this unbounded.
 _CACHE: "OrderedDict[str, str]" = OrderedDict()
@@ -212,22 +300,26 @@ def _cache_put(key: str, value: str) -> None:
 # source/target language even though MyMemory's Sanskrit coverage is
 # unreliable in practice (sparse community-contributed translation memory).
 # It's still mapped below on the chance a given phrase is covered; real
-# Sanskrit reliability comes from Google (tried first) and the offline
-# gloss fallback (tried last), not from MyMemory specifically. Not yet
-# exercised against live Sanskrit traffic — if MyMemory rejects the pair
-# outright, the existing per-provider try/except already falls through.
+# Sanskrit reliability comes from Sarvam/Google (tried earlier) and the
+# offline gloss fallback (tried last), not from MyMemory specifically. Not
+# yet exercised against live Sanskrit traffic — if MyMemory rejects the
+# pair outright, the existing per-provider try/except already falls
+# through.
 _LANG_MAP = {"te": "te", "hi": "hi", "ta": "ta", "ml": "ml", "sa": "sa", "en": "en"}
 _MYMEMORY_LANG_MAP = {"te": "te-IN", "hi": "hi-IN", "ta": "ta-IN", "ml": "ml-IN", "sa": "sa-IN", "en": "en-US"}
 
-# Each free provider enforces its OWN hard per-request character limit,
+# Each provider enforces its OWN hard per-request character limit,
 # independent of rate-limiting/network issues:
+#   - Sarvam: no officially documented hard cap, but chunking at a
+#     conservative size keeps each request coherent and avoids timeouts on
+#     long, multi-source assembled answers.
 #   - Google (via deep-translator's scrape endpoint): ~5000 chars/request.
 #   - MyMemory: a hard 500 chars/request (raises NotValidLength above that;
 #     see deep_translator/mymemory.py -- is_input_valid(text, max_chars=500)).
 # The assembled multi-source answer routinely exceeds 500 chars, so without
 # chunking, MyMemory rejects it every single time regardless of connectivity.
 # Limits below are set conservatively under each provider's real cap.
-_PROVIDER_MAX_CHARS = {"google": 4500, "mymemory": 480, "bhashini": 2000}
+_PROVIDER_MAX_CHARS = {"sarvam": 900, "google": 4500, "mymemory": 480, "bhashini": 2000}
 
 
 def _split_into_chunks(text: str, max_chars: int) -> List[str]:
@@ -303,8 +395,8 @@ def _translate_full_text(text: str, translate_one: Callable[[str], str], max_cha
 
 def _translate_with_fallback_providers(text: str, source: str, target: str) -> Optional[str]:
     """
-    Try each free provider in order; return the first non-empty result, or
-    None if all of them fail (offline, rate-limited, service down, wrong
+    Try each provider in order; return the first non-empty result, or None
+    if all of them fail (offline, rate-limited, service down, wrong
     language code, text too long for that provider's own limit, etc.). Each
     provider's exceptions are caught and logged individually so one
     provider's failure doesn't stop us from trying the next -- but the
@@ -317,9 +409,20 @@ def _translate_with_fallback_providers(text: str, source: str, target: str) -> O
         logger.info("translation cache hit (%s->%s, %d chars)", source, target, len(text))
         return cached
 
-    providers = []
+    providers: List[Tuple[str, Callable[[str], Optional[str]], int]] = []
 
-    # Bhashini first, per the problem statement's explicit preference for
+    # Sarvam first: the SDK and key are already in place for ASR/TTS, it's
+    # an authenticated API rather than a rate-limited scrape, and it's
+    # purpose-built for Indian languages. Only added when actually usable,
+    # same reasoning as the Bhashini/free-provider guards below.
+    if _SARVAM_AVAILABLE and _sarvam_api_key():
+        providers.append((
+            "sarvam",
+            lambda t: _sarvam_translate_one(t, source, target),
+            _PROVIDER_MAX_CHARS["sarvam"],
+        ))
+
+    # Bhashini next, per the problem statement's explicit preference for
     # national language infrastructure. Only added to the chain when
     # credentials are configured — otherwise _bhashini_translate_one would
     # just return None on every chunk, so skip it outright to avoid a
@@ -328,7 +431,7 @@ def _translate_with_fallback_providers(text: str, source: str, target: str) -> O
         providers.append((
             "bhashini",
             lambda t: _bhashini_translate_one(t, source, target),
-            _PROVIDER_MAX_CHARS.get("bhashini", 2000),
+            _PROVIDER_MAX_CHARS["bhashini"],
         ))
 
     if _AVAILABLE:
@@ -355,6 +458,10 @@ def _translate_with_fallback_providers(text: str, source: str, target: str) -> O
         try:
             result = _translate_full_text(text, translate_one, max_chars)
             if result:
+                logger.info(
+                    "translation succeeded via '%s' (%s->%s, %d chars)",
+                    name, source, target, len(text),
+                )
                 _cache_put(key, result)
                 return result
         except Exception as e:
@@ -367,17 +474,19 @@ def bhashini_status() -> dict:
     """Small transparency helper for /api/health and the eval dashboard —
     reports whether Bhashini NMT (translation) is actually configured in
     this deployment, without leaking the credential values themselves. See
-    app/asr.py's asr_status() for the separate ASR (voice) credential."""
+    sarvam_translate_status() above and app/asr.py's asr_status() for the
+    sibling credential checks."""
     configured = _bhashini_credentials() is not None and _HTTPX_AVAILABLE
     return {
         "configured": configured,
         "note": (
             "BHASHINI_NMT_USER_ID / BHASHINI_NMT_API_KEY set — Bhashini is "
-            "the first translation provider tried."
+            "tried if Sarvam is unavailable."
             if configured
             else "Not configured in this environment — falling back to "
-            "Google Translate / MyMemory. Set BHASHINI_NMT_USER_ID and "
-            "BHASHINI_NMT_API_KEY to enable the Bhashini (ULCA) NMT provider."
+            "Google Translate / MyMemory if Sarvam is also unavailable. Set "
+            "BHASHINI_NMT_USER_ID and BHASHINI_NMT_API_KEY to enable the "
+            "Bhashini (ULCA) NMT provider."
         ),
     }
 
@@ -416,4 +525,3 @@ def translate_to_english(text: str, source_lang: str) -> Tuple[str, bool]:
     if translated is None:
         return text, False
     return translated, True
-

@@ -54,6 +54,7 @@ def health():
         "status": "ok",
         "corpus_documents": len(retrieval._CORPUS),
         "retrieval_backend": retrieval.BACKEND,
+        "sarvam_translate": translate.sarvam_translate_status(),
         "bhashini": translate.bhashini_status(),
         "sarvam_voice": asr.asr_status(),
     }

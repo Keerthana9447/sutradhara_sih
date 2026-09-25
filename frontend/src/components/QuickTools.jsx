@@ -3,6 +3,8 @@ import { ShieldCheck, ScrollText, Loader2, Search, Check, Minus, AlertCircle, Li
 import { api } from '../api'
 import JurisdictionSwitch from './JurisdictionSwitch'
 import SourceCard from './SourceCard'
+import MicButton from './MicButton'
+import ReadAloudButton from './ReadAloudButton'
 import { EmptyPlate, LeafSprig, ManuscriptRule } from './Botanical'
 
 /**
@@ -35,7 +37,20 @@ function ToolShell({ icon: Icon, title, lede, copy, children }) {
   )
 }
 
-function QueryBox({ value, onChange, placeholder, onSubmit, loading, buttonLabel, loadingLabel, extra }) {
+function QueryBox({
+  value,
+  onChange,
+  placeholder,
+  onSubmit,
+  loading,
+  buttonLabel,
+  loadingLabel,
+  extra,
+  copy,
+  language,
+  readAloudText,
+  readAloudLang,
+}) {
   return (
     <div className="dossier-panel p-4 sm:p-5 mb-6 border-green/20">
       {extra && <div className="flex items-center justify-end mb-3">{extra}</div>}
@@ -46,7 +61,23 @@ function QueryBox({ value, onChange, placeholder, onSubmit, loading, buttonLabel
         rows={3}
         className="research-input w-full min-h-24 border border-hairline rounded-md px-4 py-3 text-sm leading-relaxed focus:outline-none"
       />
-      <div className="flex justify-end mt-3">
+      <div className="flex items-center justify-between mt-3 flex-wrap gap-2">
+        <span className="inline-flex items-center gap-2.5">
+          <MicButton
+            sourceLanguage={language}
+            copy={copy}
+            onTranscribed={(text) =>
+              onChange(value.trim() ? `${value.trim()} ${text}` : text)
+            }
+          />
+
+          <ReadAloudButton
+            text={readAloudText || ''}
+            lang={readAloudLang || language}
+            copy={copy}
+          />
+        </span>
+
         <button
           onClick={onSubmit}
           disabled={!value.trim() || loading}
@@ -93,6 +124,10 @@ export function ABSTool({ copy, language }) {
         buttonLabel={copy.absButton}
         loadingLabel={copy.working}
         extra={<JurisdictionSwitch value={jurisdiction} onChange={setJurisdiction} copy={copy} />}
+        copy={copy}
+        language={language}
+        readAloudText={!loading && result && !result.abstained ? result.answer : ''}
+        readAloudLang={result?.answer_language || language}
       />
 
       {error && <p className="text-sm text-rust mb-4">{error}</p>}
@@ -167,6 +202,10 @@ export function TKDLTool({ copy, language }) {
         buttonLabel={copy.tkdlButton}
         loadingLabel={copy.working}
         extra={<JurisdictionSwitch value={jurisdiction} onChange={setJurisdiction} copy={copy} />}
+        copy={copy}
+        language={language}
+        readAloudText={!loading && result && !result.abstained ? result.answer : ''}
+        readAloudLang={result?.answer_language || language}
       />
 
       {error && <p className="text-sm text-rust mb-4">{error}</p>}
@@ -219,7 +258,7 @@ function EmptyTool({ icon: Icon, label, preview, text }) {
   )
 }
 
-export function ConnectorTool({ copy }) {
+export function ConnectorTool({ copy, language }) {
   const [provider, setProvider] = useState('')
   const [apiKey, setApiKey] = useState('')
   const [connectors, setConnectors] = useState([])
@@ -270,7 +309,7 @@ export function ConnectorTool({ copy }) {
     if (!usageTarget || !usageQuery.trim()) return
     setUsageLoading(true)
     try {
-      const res = await api.analyze({ query: usageQuery, jurisdiction: 'India', language: 'en', use_connector_id: usageTarget })
+      const res = await api.analyze({ query: usageQuery, jurisdiction: 'India', language, use_connector_id: usageTarget })
       setUsageResult(res.connector_source_used)
     } catch (e) {
       setError(copy.systemError)
@@ -359,7 +398,25 @@ export function ConnectorTool({ copy }) {
             rows={2}
             className="research-input w-full border border-hairline rounded-md px-3 py-2.5 text-sm focus:outline-none mb-3"
           />
-          <div className="flex justify-end">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <span className="inline-flex items-center gap-2.5">
+              <MicButton
+                sourceLanguage={language}
+                copy={copy}
+                onTranscribed={(text) =>
+                  setUsageQuery((prev) =>
+                    prev.trim() ? `${prev.trim()} ${text}` : text
+                  )
+                }
+              />
+
+              <ReadAloudButton
+                text={usageResult ? usageResult.note || '' : ''}
+                lang={language}
+                copy={copy}
+              />
+            </span>
+
             <button
               onClick={simulateUse}
               disabled={!usageQuery.trim() || usageLoading}

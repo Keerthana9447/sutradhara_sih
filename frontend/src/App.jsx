@@ -297,7 +297,7 @@ export default function App() {
             )}
 
             {tab === 'connectors' && (
-              <ConnectorTool copy={copy} />
+              <ConnectorTool copy={copy} language={lang} />
             )}
 
             {tab === 'analyze' && (

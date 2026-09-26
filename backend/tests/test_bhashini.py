@@ -2,7 +2,7 @@
 Bhashini (ULCA) provider tests.
 
 This sandbox's network egress does not include meity-auth.ulcacontrib.org
-(same restriction that keeps the sentence-transformers embeddings backend on
+(same restriction that keeps the BGE/fastembed dense-retrieval backend on
 its TF-IDF fallback — see retrieval.py), so the two-step ULCA HTTP flow is
 exercised here against a mocked httpx.Client rather than the live service.
 This proves the request/response wiring is correct; it does not prove the

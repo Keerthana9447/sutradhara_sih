@@ -68,7 +68,7 @@ except ImportError:
 
 logger = logging.getLogger("ip_sakti.asr")
 
-SUPPORTED_ASR_LANGUAGES = ("en", "hi", "te", "ta", "ml")
+SUPPORTED_ASR_LANGUAGES = ("en", "hi", "te", "ta", "ml", "sa")
 _LANGUAGE_CODES = {"en": "en-IN", "hi": "hi-IN", "te": "te-IN", "ta": "ta-IN", "ml": "ml-IN", "sa": "hi-IN"}
 
 

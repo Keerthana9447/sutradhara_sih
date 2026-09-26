@@ -79,6 +79,30 @@ the brief exactly.
 4. Confidence is computed from the *retained* set (§I below).
 5. If confidence is below threshold or the set is empty → abstain.
 
+## E.1 Deterministic pipeline orchestration (`backend/app/dag.py`)
+
+`POST /api/analyze` no longer runs as one long imperative function inside
+`main.py`. It's now a deterministic LangGraph `StateGraph`:
+
+```
+normalize_language → expand_query → classify
+    ─(needs_clarification)→ clarification_response → END
+    ─(else)→ route_areas → retrieve → score_confidence
+             → enrich_evidence → use_connector → log_evidence
+    ─(abstained)→ abstain_response → END
+    ─(else)→ build_answer → paraphrase → finalize_success → END
+```
+
+Every edge is a plain `if`/`else` on state already computed earlier in the
+graph (`needs_clarification`, `abstained`) — never a decision an LLM makes —
+so the path taken and the output produced are 100% reproducible for a given
+input, corpus, and config. If the `langgraph` package isn't installed, the
+same node functions run through a hand-written sequential executor instead
+(same fallback pattern as the FAISS/TF-IDF split above); `GET /api/health`
+reports which backend (`langgraph` or `sequential`) actually executed via
+`dag_backend`. See `backend/app/dag.py`'s module docstring and
+`backend/tests/test_deterministic_dag.py`.
+
 ## F. API specification
 
 | Method | Path | Purpose |

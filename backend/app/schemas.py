@@ -89,6 +89,101 @@ class AnalyzeResponse(BaseModel):
     # POST /api/graph/reason. None only if graph construction itself failed
     # (never fabricated as a fallback).
     dynamic_graph: Optional[dict] = None
+    # Non-blocking "always-current law" caveat (see app/corpus_freshness.py):
+    # set only when one or more of the CITED sources for this answer have
+    # not been re-verified against their authoritative source in over
+    # SUTRADHARA_STALE_DAYS days. None means every cited source is within
+    # the freshness window — never fabricated, never suppressed.
+    stale_sources_warning: Optional[str] = None
+
+
+# --------------------------------------------------------------------------
+# Live official registry lookup — see app/registry_lookup.py
+# --------------------------------------------------------------------------
+class RegistryLookupRequest(BaseModel):
+    jurisdiction: str = Field(..., description="'India' or 'International'")
+    keyword: str = Field(..., description="Search term, e.g. a formulation or product name")
+    registry: str = Field(default="patents", description="'patents' | 'trademarks' | 'gi' (India only; International is patents-only)")
+    limit: int = Field(default=5, ge=1, le=20)
+
+
+# --------------------------------------------------------------------------
+# Privacy / data-governance rights — see app/privacy.py
+# --------------------------------------------------------------------------
+class PrivacyLookupRequest(BaseModel):
+    query_text: Optional[str] = Field(default=None, description="The exact question you previously typed")
+    contact_email: Optional[str] = Field(default=None, description="The email you supplied when escalating to a human")
+
+
+class PrivacyPurgeRequest(BaseModel):
+    retention_days: Optional[int] = Field(default=None, description="Override the default retention window for this run only")
+
+
+# --- Consent Manager reference implementation (see app/privacy.py) --------
+class ConsentRequestRequest(BaseModel):
+    data_principal_ref: str = Field(..., description="How you identify yourself, e.g. the email you use for escalation")
+    purpose: str = Field(..., description="Plain-language purpose this consent covers")
+    data_categories: List[str] = Field(..., description="Categories of data this consent covers, e.g. ['query_text']")
+    expires_in_days: Optional[int] = Field(default=None, description="Optional expiry; omit for no expiry")
+
+
+class ConsentIdRequest(BaseModel):
+    consent_id: str
+
+
+class ConsentInfo(BaseModel):
+    consent_id: str
+    data_principal_ref: str
+    purpose: str
+    data_categories: List[str]
+    data_fiduciary: str
+    status: str
+    requested_at: str
+    granted_at: Optional[str] = None
+    revoked_at: Optional[str] = None
+    expires_at: Optional[str] = None
+
+
+# --- DPIA / breach / ROPA (see app/privacy.py) -----------------------------
+class DPIARequest(BaseModel):
+    processing_activity: str
+    risk_level: str = Field(..., description="'low' | 'medium' | 'high'")
+    reviewer: Optional[str] = None
+    mitigations: Optional[str] = None
+
+
+class BreachReportRequest(BaseModel):
+    description: str
+    affected_categories: Optional[List[str]] = None
+    severity: str = Field(default="unknown", description="'low' | 'medium' | 'high' | 'unknown'")
+
+
+class BreachIdRequest(BaseModel):
+    breach_id: str
+
+
+class ProcessingActivityRequest(BaseModel):
+    purpose: str
+    data_categories: List[str]
+    legal_basis: str
+    retention_period_days: Optional[int] = None
+
+
+# --- Cross-border transfer check (see app/privacy.py) ----------------------
+class CrossBorderCheckRequest(BaseModel):
+    destination_country: str
+    purpose: Optional[str] = None
+    data_categories: Optional[List[str]] = None
+
+
+# --- Corpus auto-refresh (see app/corpus_freshness.py) ----------------------
+class CorpusRefreshRequest(BaseModel):
+    doc_ids: Optional[List[str]] = Field(default=None, description="Restrict to these corpus document ids; omit for all")
+
+
+class CorpusRefreshApproveRequest(BaseModel):
+    doc_id: str
+    reviewer: str = Field(..., description="Name/identifier of the human approving this refresh")
 
 
 class EscalateRequest(BaseModel):

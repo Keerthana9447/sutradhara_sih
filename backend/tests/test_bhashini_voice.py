@@ -142,7 +142,7 @@ def test_public_transcribe_fails_safe_when_both_providers_unavailable(monkeypatc
 
     text, ok = asr.transcribe(_fake_audio_b64(), "en")
     assert ok is False
-    assert "sarvam and bhashini" in text.lower()
+    assert "bhashini and sarvam" in text.lower()
 
 
 def test_live_bhashini_asr_path():

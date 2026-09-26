@@ -10,3 +10,38 @@ httpx==0.27.2
 python-dotenv==1.0.1
 reportlab==5.0.1
 sarvamai==0.1.34
+
+# --- Dense retrieval (BGE embeddings) ---
+# fastembed runs BAAI/bge-small-en-v1.5 via ONNX Runtime — deliberately NOT
+# sentence-transformers/torch (multi-GB install, slow cold start on small
+# hosting tiers). fastembed's own deps (onnxruntime, tokenizers,
+# huggingface-hub) are CPU-only and comparatively lightweight. See
+# app/retrieval.py for the full explanation and the TF-IDF fallback that
+# runs if this stack isn't installed or the model can't be downloaded.
+fastembed==0.3.6
+faiss-cpu==1.9.0
+
+# --- Deterministic pipeline orchestration (app/dag.py) ---
+# Wires the /api/analyze pipeline (classify -> route -> retrieve -> score ->
+# answer -> translate) as an explicit LangGraph StateGraph with plain
+# if/else conditional edges on already-computed state (needs_clarification,
+# abstained) -- never an LLM-driven routing decision, so the graph shape is
+# fully deterministic and reproducible. If this package is missing or fails
+# to import, app/dag.py falls back to `_run_sequential`, a hand-written
+# executor that calls the exact same node functions in the exact same
+# order/branches with zero LangGraph dependency -- same pattern as the
+# fastembed/faiss-cpu fallback to TF-IDF above.
+langgraph==0.2.34
+
+# --- Live corpus-freshness checks + registry lookups (optional at runtime) ---
+# Used by app/corpus_freshness.py (live_check=true) and app/registry_lookup.py
+# (PatentsView). Both call sites import it lazily and fail closed if it's
+# missing or the network call errors — see those modules' docstrings.
+requests==2.32.3
+
+# --- Optional live knowledge-graph backend (app/graph_store.py) ---
+# Only used if NEO4J_URI/NEO4J_USER/NEO4J_PASSWORD are set and a Neo4j
+# instance is reachable; otherwise app/graph_reasoning.py's in-memory
+# traversal runs unchanged (same fallback pattern as fastembed/faiss-cpu
+# and langgraph above).
+neo4j==5.24.0

@@ -9,19 +9,23 @@ try:
 except ImportError:
     pass
 
-from typing import List
+from typing import List, Optional
 
 from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 
-from . import classifier, jurisdiction, retrieval, confidence, answer, db, translate
-from . import language, query_expansion, llm, pathway, tkdl_similarity, posture_pdf
-from . import graph_reasoning, eval_runner, connectors, graph, asr
+from . import jurisdiction, retrieval, db, translate, posture_pdf
+from . import graph_reasoning, eval_runner, connectors, graph, asr, dag
+from . import corpus_freshness, privacy, registry_lookup, graph_store
 from .schemas import (
     AnalyzeRequest, AnalyzeResponse, SourceRef,
     EscalateRequest, FeedbackRequest, PostureRequest,
     ConnectorLinkRequest, ConnectorInfo, ConnectorRevokeRequest,
     GraphReasonRequest, ASRRequest, ASRResponse, TTSRequest, TTSResponse,
+    RegistryLookupRequest, PrivacyLookupRequest, PrivacyPurgeRequest,
+    ConsentRequestRequest, ConsentIdRequest, DPIARequest, BreachReportRequest,
+    BreachIdRequest, ProcessingActivityRequest, CrossBorderCheckRequest,
+    CorpusRefreshRequest, CorpusRefreshApproveRequest,
 )
 
 app = FastAPI(title="SUTRADHARA API", version="0.1.0-prototype")
@@ -50,192 +54,49 @@ def _startup():
 
 @app.get("/api/health")
 def health():
+    freshness = corpus_freshness.freshness_report()
     return {
         "status": "ok",
         "corpus_documents": len(retrieval._CORPUS),
+        "stale_corpus_documents": freshness["counts"]["stale"],
         "retrieval_backend": retrieval.BACKEND,
+        "dag_backend": dag.DAG_BACKEND,
+        "graph_backend": graph_store.GRAPH_BACKEND,
         "sarvam_translate": translate.sarvam_translate_status(),
         "bhashini": translate.bhashini_status(),
         "sarvam_voice": asr.asr_status(),
         "bhashini_voice": asr.bhashini_asr_status(),
         "bhashini_tts": asr.bhashini_tts_status(),
+        "patentsview": registry_lookup.patentsview_status(),
     }
 
 
 @app.post("/api/analyze", response_model=AnalyzeResponse)
 def analyze(req: AnalyzeRequest):
+    """
+    Thin HTTP adapter. All pipeline logic (language normalization, query
+    expansion, classification, retrieval, confidence scoring, evidence
+    enrichment, answer generation, paraphrasing, translation) lives in the
+    deterministic LangGraph DAG defined in app/dag.py — see that module's
+    docstring for the graph shape and the langgraph/sequential fallback.
+    Jurisdiction resolution stays here because it can raise a client-facing
+    400, which belongs at the HTTP layer, not inside the pipeline graph.
+    """
     try:
         jur = jurisdiction.resolve_jurisdiction(req.jurisdiction)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-    # --- Multilingual normalization (retrieval-only; original query text is
-    # preserved untouched for display, logging, and escalation). ---
-    input_language = language.detect_language(req.query)
-    retrieval_query = req.query
-    if input_language != "en":
-        translated, translated_ok = translate.translate_to_english(req.query, input_language)
-        if translated_ok and translated.strip():
-            retrieval_query = translated
-        else:
-            # Second, offline normalization strategy per the error-handling
-            # requirement — never silently fall through to raw non-English
-            # text, which would zero out the English-only TF-IDF tokenizer.
-            retrieval_query = language.fallback_normalize(req.query)
-
-    query_variants = query_expansion.expand_query(retrieval_query)
-
-    # Classification and area-routing are keyword-based over English terms,
-    # so they must also see the (translated) English retrieval query — not
-    # the raw original-language text — to work for any input language rather
-    # than only via the manual confirmed_category fallback path.
-    classification = classifier.classify(retrieval_query, req.confirmed_category)
-
-    if classification.needs_clarification:
-        # Return early — the frontend should surface the clarification
-        # question before calling /api/analyze again with confirmed_category set.
-        abs_checklist = answer.build_abs_checklist(retrieval_query, [])
-        return AnalyzeResponse(
-            classification=classification,
-            jurisdiction=jur,
-            applicable_areas=[],
-            answer="",
-            confidence=0.0,
-            confidence_label="LOW",
-            confidence_breakdown={},
-            sources=[],
-            abs_checklist=abs_checklist,
-            abstained=True,
-            input_language=input_language,
-            retrieval_query=retrieval_query if retrieval_query != req.query else None,
-        )
-
-    areas = jurisdiction.route_areas(retrieval_query, classification.category)
-    retrieved = [] if jurisdiction.has_unsupported_foreign_country(req.query, jur) else retrieval.retrieve(query_variants, jur, areas, top_k=5)
-
-    conf_score, conf_label, breakdown = confidence.score(retrieved, classification.confidence)
-    abstained = confidence.should_abstain(conf_score, retrieved)
-    abs_checklist = answer.build_abs_checklist(retrieval_query, retrieved)
-    tk_pointer = answer.build_tk_pointer(classification.category, jur)
-    regulatory_pathway = pathway.get_pathway(classification.category, jur)
-    tk_similarity = tkdl_similarity.maybe_score_resemblance(retrieval_query, classification.category)
-
-    # Live, per-query explainability graph -- built from what was actually
-    # retrieved for THIS query (see app/graph.py). Never allowed to break the
-    # main analyze response if graph construction itself has a bug: falls
-    # back to None rather than a 500, since this is a supplementary
-    # visualization, not part of the evidence/citation guarantee.
-    try:
-        dynamic_graph = graph.build_dynamic_graph(req.query, classification.category, jur, retrieved, areas)
-    except Exception:
-        logger.exception("Dynamic graph construction failed; omitting from response")
-        dynamic_graph = None
-
-    # Optional paid-subscription connector use — strictly opt-in per request
-    # (see schemas.AnalyzeRequest.use_connector_id) and logged regardless of
-    # outcome. Never merged into `sources`/citation-integrity — kept as a
-    # separately-tagged field so the corpus-grounding guarantee on `sources`
-    # is untouched by a third-party result this app cannot itself verify.
-    connector_source_used = None
-    if req.use_connector_id:
-        connector_source_used = connectors.use_connector(req.use_connector_id, req.query)
-
-    lang = req.language if req.language in ("en", "te", "hi", "ta", "ml", "sa") else "en"
-
-    logger.info(
-        "INPUT_LANGUAGE=%s RETRIEVAL_LANGUAGE=en ORIGINAL=%r NORMALIZED=%r "
-        "CLASSIFICATION=%s JURISDICTION=%s AREAS=%s RETRIEVED_CHUNKS=%d "
-        "TOP_SCORE=%s SOURCES=%s EVIDENCE_SCORE=%s ABSTAIN=%s",
-        input_language, req.query, retrieval_query,
-        classification.category, jur, areas, len(retrieved),
-        (retrieved[0]["relevance_score"] if retrieved else None),
-        [s["id"] for s in retrieved], conf_score, abstained,
-    )
-
-    if abstained:
-        db.log_audit(req.query, jur, classification.category, conf_score, True, retrieved)
-        abstain_text, ok = translate.translate_text(
-            "Insufficient authoritative evidence to provide a reliable answer from the available corpus.",
-            lang,
-        )
-        return AnalyzeResponse(
-            classification=classification,
-            jurisdiction=jur,
-            applicable_areas=areas,
-            answer=abstain_text,
-            confidence=conf_score,
-            confidence_label=conf_label,
-            confidence_breakdown=breakdown,
-            sources=[SourceRef(**{**s, "relevance_score": s["relevance_score"]}) for s in retrieved],
-            abs_checklist=abs_checklist,
-            tk_pointer=tk_pointer,
-            abstained=True,
-            answer_language=lang,
-            translation_available=ok,
-            input_language=input_language,
-            retrieval_query=retrieval_query if retrieval_query != req.query else None,
-            regulatory_pathway=regulatory_pathway,
-            tk_similarity=tk_similarity,
-            connector_source_used=connector_source_used,
-            dynamic_graph=dynamic_graph,
-        )
-
-    generated_answer = answer.build_answer(req.query, classification.category, jur, retrieved)
-
-    # Optional Groq paraphrase layer: smooths the template-assembled answer
-    # into more natural prose for display. Runs BEFORE Telugu translation and
-    # is fail-safe — see llm.py. Every [Source: ...] tag must survive
-    # unchanged or the original grounded text is used instead, so this can
-    # never introduce an uncited or fabricated claim.
-    generated_answer, used_llm = llm.paraphrase_answer(generated_answer)
-    logger.info("LLM_PARAPHRASE_APPLIED=%s", used_llm)
-
-    db.log_audit(req.query, jur, classification.category, conf_score, False, retrieved)
-
-    # Translate the natural-language pieces only. Source titles, section
-    # numbers, authority names, category labels, and area names are official
-    # identifiers and are deliberately left untranslated (see app/translate.py).
-    translation_ok = True
-    if lang != "en":
-        generated_answer, ok1 = translate.translate_text(generated_answer, lang)
-        classification.reason, ok2 = translate.translate_text(classification.reason, lang)
-        translation_ok = ok1 and ok2
-        if tk_pointer:
-            tk_pointer, ok3 = translate.translate_text(tk_pointer, lang)
-            translation_ok = translation_ok and ok3
-        if abs_checklist:
-            abs_checklist.note, ok4 = translate.translate_text(abs_checklist.note, lang)
-            translation_ok = translation_ok and ok4
-        if regulatory_pathway:
-            translated_steps = []
-            for step in regulatory_pathway:
-                t_step, ok5 = translate.translate_text(step, lang)
-                translated_steps.append(t_step)
-                translation_ok = translation_ok and ok5
-            regulatory_pathway = translated_steps
-
-    return AnalyzeResponse(
-        classification=classification,
-        jurisdiction=jur,
-        applicable_areas=areas,
-        answer=generated_answer,
-        confidence=conf_score,
-        confidence_label=conf_label,
-        confidence_breakdown=breakdown,
-        sources=[SourceRef(**s) for s in retrieved],
-        abs_checklist=abs_checklist,
-        tk_pointer=tk_pointer,
-        abstained=False,
-        answer_language=lang,
-        translation_available=translation_ok,
-        input_language=input_language,
-        retrieval_query=retrieval_query if retrieval_query != req.query else None,
-        llm_paraphrased=used_llm,
-        regulatory_pathway=regulatory_pathway,
-        tk_similarity=tk_similarity,
-        connector_source_used=connector_source_used,
-        dynamic_graph=dynamic_graph,
-    )
+    initial_state = {
+        "query": req.query,
+        "jurisdiction": req.jurisdiction,
+        "language": req.language,
+        "confirmed_category": req.confirmed_category,
+        "use_connector_id": req.use_connector_id,
+        "jur": jur,
+    }
+    response_fields = dag.run_analyze_pipeline(initial_state)
+    return AnalyzeResponse(**response_fields)
 
 
 @app.post("/api/query")
@@ -388,5 +249,196 @@ def tts_synthesize(req: TTSRequest):
 def graph_reason(req: GraphReasonRequest):
     try:
         return graph_reasoning.reason(req.category, req.jurisdiction, req.export_intent)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+# --------------------------------------------------------------------------
+# Corpus freshness / "always-current law" — see app/corpus_freshness.py
+# --------------------------------------------------------------------------
+@app.get("/api/corpus/freshness")
+def corpus_freshness_endpoint(live_check: bool = False):
+    """Per-document staleness report. Pass ?live_check=true to also probe
+    whether each source's real URL still resolves (requires outbound
+    internet on the server; see corpus_freshness.py for exactly what that
+    does and does not verify)."""
+    report = corpus_freshness.freshness_report()
+    if live_check:
+        report["live_reachability"] = corpus_freshness.check_live_reachability()
+    return report
+
+
+# --------------------------------------------------------------------------
+# Live official registry access — see app/registry_lookup.py
+# --------------------------------------------------------------------------
+@app.post("/api/registry/lookup")
+def registry_lookup_endpoint(req: RegistryLookupRequest):
+    try:
+        return registry_lookup.lookup(req.jurisdiction, req.keyword, req.registry, req.limit)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+# --------------------------------------------------------------------------
+# DPDP-aligned data governance rights — see app/privacy.py
+# --------------------------------------------------------------------------
+@app.get("/api/privacy/policy")
+def privacy_policy():
+    return privacy.compliance_status()
+
+
+@app.post("/api/privacy/access")
+def privacy_access(req: PrivacyLookupRequest):
+    try:
+        return privacy.access_report(req.query_text, req.contact_email)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/api/privacy/erase")
+def privacy_erase(req: PrivacyLookupRequest):
+    try:
+        deleted = privacy.erase(req.query_text, req.contact_email)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"status": "erased", "deleted": deleted}
+
+
+@app.post("/api/privacy/purge-expired")
+def privacy_purge_expired(req: PrivacyPurgeRequest):
+    deleted = privacy.purge_expired(req.retention_days)
+    return {"status": "purged", "deleted": deleted}
+
+
+# --- Consent Manager reference implementation (see app/privacy.py) --------
+@app.post("/api/privacy/consent/request")
+def consent_request(req: ConsentRequestRequest):
+    try:
+        return privacy.request_consent(req.data_principal_ref, req.purpose, req.data_categories, req.expires_in_days)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/api/privacy/consent/grant")
+def consent_grant(req: ConsentIdRequest):
+    try:
+        return privacy.grant_consent(req.consent_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/api/privacy/consent/revoke")
+def consent_revoke(req: ConsentIdRequest):
+    try:
+        return privacy.revoke_consent(req.consent_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.get("/api/privacy/consent/{consent_id}")
+def consent_get(consent_id: str):
+    consent = privacy.get_consent(consent_id)
+    if consent is None:
+        raise HTTPException(status_code=404, detail="Consent artifact not found")
+    return consent
+
+
+@app.get("/api/privacy/consents")
+def consent_list(data_principal_ref: Optional[str] = None):
+    return privacy.list_consents(data_principal_ref)
+
+
+# --- DPIA / breach register / ROPA (see app/privacy.py) --------------------
+@app.post("/api/privacy/dpia")
+def dpia_create(req: DPIARequest):
+    try:
+        return privacy.record_dpia(req.processing_activity, req.risk_level, req.reviewer, req.mitigations)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.get("/api/privacy/dpia")
+def dpia_list():
+    return privacy.list_dpias()
+
+
+@app.post("/api/privacy/breach")
+def breach_create(req: BreachReportRequest):
+    try:
+        return privacy.report_breach(req.description, req.affected_categories, req.severity)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.get("/api/privacy/breach")
+def breach_list():
+    return privacy.list_breaches()
+
+
+@app.post("/api/privacy/breach/notify-board")
+def breach_notify_board(req: BreachIdRequest):
+    try:
+        return privacy.notify_board(req.breach_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@app.post("/api/privacy/breach/notify-principals")
+def breach_notify_principals(req: BreachIdRequest):
+    try:
+        return privacy.notify_principals(req.breach_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@app.post("/api/privacy/ropa")
+def ropa_create(req: ProcessingActivityRequest):
+    try:
+        return privacy.log_processing_activity(req.purpose, req.data_categories, req.legal_basis, req.retention_period_days)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.get("/api/privacy/ropa")
+def ropa_list():
+    return privacy.list_processing_activities()
+
+
+# --- Cross-border transfer check (see app/privacy.py) ----------------------
+@app.post("/api/privacy/cross-border/check")
+def cross_border_check(req: CrossBorderCheckRequest):
+    try:
+        return privacy.check_transfer(req.destination_country, req.purpose, req.data_categories)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.get("/api/privacy/cross-border/log")
+def cross_border_log():
+    return privacy.list_transfer_log()
+
+
+# --------------------------------------------------------------------------
+# Corpus auto-refresh / drift detection — see app/corpus_freshness.py
+# --------------------------------------------------------------------------
+@app.post("/api/corpus/refresh/propose")
+def corpus_refresh_propose(req: CorpusRefreshRequest):
+    """Fetch each targeted document's live source and detect drift since
+    the last check. Requires outbound internet on the server; each result
+    is fetched fresh, nothing here is fabricated. See corpus_freshness.py
+    for exactly what 'pending_review' does and does not mean."""
+    return {"results": corpus_freshness.propose_refresh(req.doc_ids)}
+
+
+@app.get("/api/corpus/refresh/state")
+def corpus_refresh_state(doc_ids: Optional[str] = None):
+    ids = doc_ids.split(",") if doc_ids else None
+    return {"documents": corpus_freshness.refresh_state(ids)}
+
+
+@app.post("/api/corpus/refresh/approve")
+def corpus_refresh_approve(req: CorpusRefreshApproveRequest):
+    try:
+        return corpus_freshness.approve_refresh(req.doc_id, req.reviewer)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

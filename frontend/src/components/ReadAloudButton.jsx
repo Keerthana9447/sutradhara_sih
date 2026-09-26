@@ -14,7 +14,7 @@ const LOCALES = {
 // Backend voice synthesis (Sarvam Bulbul / Bhashini, app/asr.py) only
 // covers these languages — see _LANGUAGE_CODES / SUPPORTED_ASR_LANGUAGES
 // server-side. Sanskrit falls straight to the browser voice like before.
-const BACKEND_TTS_LANGUAGES = new Set(['en', 'hi', 'te', 'ta', 'ml'])
+const BACKEND_TTS_LANGUAGES = new Set(['en', 'hi', 'te', 'ta', 'ml', 'sa'])
 
 // TTSRequest caps text at 2500 chars server-side (app/schemas.py) — a
 // longer answer skips the backend call entirely rather than sending a
@@ -79,7 +79,7 @@ export default function ReadAloudButton({ text, lang, copy }) {
     stop()
 
     const useBackendVoice =
-      lang !== 'en' && BACKEND_TTS_LANGUAGES.has(lang) && text.length <= BACKEND_TTS_MAX_CHARS
+      BACKEND_TTS_LANGUAGES.has(lang) && text.length <= BACKEND_TTS_MAX_CHARS
 
     if (useBackendVoice) {
       setState('loading')

@@ -15,7 +15,7 @@ const LOCALES = {
 // these languages — see SUPPORTED_ASR_LANGUAGES server-side. Sanskrit isn't
 // supported there, so it keeps using the browser's own recognizer mapped
 // to the closest available locale (hi-IN), same as English does natively.
-const BACKEND_ASR_LANGUAGES = new Set(['hi', 'te', 'ta', 'ml'])
+const BACKEND_ASR_LANGUAGES = new Set(['en', 'hi', 'te', 'ta', 'ml', 'sa'])
 
 function getRecognition() {
   if (typeof window === 'undefined') return null

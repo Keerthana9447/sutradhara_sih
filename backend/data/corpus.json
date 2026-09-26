@@ -8,10 +8,10 @@
     "section": "Section 3(p)",
     "summary": "Excludes from patentability an invention which, in effect, is traditional knowledge or which is an aggregation or duplication of known properties of a traditionally known component or components.",
     "version_date": "as amended by Patents (Amendment) Act, 2005",
-    "retrieved_date": "2026-09-13",
-    "source_url": "https://ipindia.gov.in (Office of the Controller General of Patents, Designs & Trade Marks — official portal; exact clause URL not verified, verify before production use)",
+    "retrieved_date": "2026-09-26",
+    "source_url": "https://www.indiacode.nic.in/handle/123456789/1392 (India Code — Patents Act, 1970, Act No. 39 of 1970; note: India Code has migrated to indiacode.gov.in, this handle still resolves via redirect)",
     "authority": "Government of India",
-    "precision": "section-level, verified provision text; deep-link not verified"
+    "precision": "section-level, verified provision text; Act landing page confirmed live, per-section deep anchor not offered by India Code"
   },
   {
     "id": "IN-PAT-3J",
@@ -22,10 +22,10 @@
     "section": "Section 3(j)",
     "summary": "Excludes plants and animals in whole or any part thereof other than micro-organisms, and essentially biological processes for production or propagation of plants and animals, from patentability.",
     "version_date": "as amended by Patents (Amendment) Act, 2005",
-    "retrieved_date": "2026-09-13",
-    "source_url": "https://ipindia.gov.in (official portal; deep-link not verified)",
+    "retrieved_date": "2026-09-26",
+    "source_url": "https://www.indiacode.nic.in/handle/123456789/1392 (India Code — Patents Act, 1970, Act No. 39 of 1970; note: India Code has migrated to indiacode.gov.in, this handle still resolves via redirect)",
     "authority": "Government of India",
-    "precision": "section-level, verified provision text; deep-link not verified"
+    "precision": "section-level, verified provision text; Act landing page confirmed live, per-section deep anchor not offered by India Code"
   },
   {
     "id": "IN-BDA-2002",
@@ -36,10 +36,10 @@
     "section": "General framework (access to biological resources and associated knowledge)",
     "summary": "Establishes the National Biodiversity Authority and requires prior approval for obtaining biological resources occurring in India and associated traditional knowledge for research, commercial use, or IP applications, with benefit-sharing conditions.",
     "version_date": "2002, as amended by the Biological Diversity (Amendment) Act, 2023",
-    "retrieved_date": "2026-09-13",
-    "source_url": "https://nbaindia.org (National Biodiversity Authority — official portal; exact section not pinpointed)",
+    "retrieved_date": "2026-09-26",
+    "source_url": "https://www.indiacode.nic.in/handle/123456789/2046 (India Code — Biological Diversity Act, 2002, Act No. 18 of 2003)",
     "authority": "Government of India / National Biodiversity Authority",
-    "precision": "act-level; exact section not pinpointed, verify before production use"
+    "precision": "act-level, confirmed live Act landing page on India Code; exact section anchor not offered by the site"
   },
   {
     "id": "IN-DC-1940",
@@ -50,10 +50,10 @@
     "section": "Provisions on Ayurvedic, Siddha and Unani drugs (Chapter IV-A and related Schedules)",
     "summary": "Distinguishes classical Ayurvedic medicines (formulations described in authoritative texts listed in the First Schedule, manufacturable under a standard licence) from Patent or Proprietary Ayurvedic medicines (novel formulations requiring formula approval before a manufacturing licence is granted).",
     "version_date": "as amended, current rules cycle",
-    "retrieved_date": "2026-09-13",
-    "source_url": "https://cdsco.gov.in / https://main.ayush.gov.in (official portals; exact rule numbers not pinpointed)",
+    "retrieved_date": "2026-09-26",
+    "source_url": "https://www.indiacode.nic.in/handle/123456789/2409 (India Code — Drugs and Cosmetics Act, 1940)",
     "authority": "Government of India / Ministry of AYUSH / CDSCO",
-    "precision": "act-level summary; exact rule numbers not pinpointed, verify before production use"
+    "precision": "act-level, confirmed live Act landing page on India Code; Rules, 1945 are a separate instrument not deep-linked here"
   },
   {
     "id": "IN-FSSAI-2016",
@@ -64,10 +64,10 @@
     "section": "General scope (Ayurveda Aahar / nutraceutical category)",
     "summary": "Governs health supplements and nutraceutical products, including Ayurveda Aahar formulations that are positioned as food rather than drugs, setting composition, labelling and claim requirements distinct from the Drugs and Cosmetics Act regime.",
     "version_date": "2016, as amended",
-    "retrieved_date": "2026-09-13",
-    "source_url": "https://fssai.gov.in (official portal; exact regulation clause not pinpointed)",
+    "retrieved_date": "2026-09-26",
+    "source_url": "https://fssai.gov.in/standards/health-supplements (FSSAI official page — Food Safety and Standards (Health Supplements, Nutraceuticals, Food for Special Dietary Use, Food for Special Medical Purpose, Functional Food and Novel Food) Regulations, 2016, with downloadable regulation PDF)",
     "authority": "Food Safety and Standards Authority of India",
-    "precision": "regulation-level summary; exact clause not pinpointed, verify before production use"
+    "precision": "regulation-level, confirmed live official FSSAI page with the actual regulation text linked; not an India Code entry (FSSAI regulations are not indexed there)"
   },
   {
     "id": "IN-GI-1999",
@@ -78,10 +78,10 @@
     "section": "General framework",
     "summary": "Provides for registration and protection of geographical indications, relevant where an Ayurvedic product's reputation or characteristics are essentially attributable to a specific geographical origin (e.g. region-specific herbal preparations).",
     "version_date": "1999, as amended",
-    "retrieved_date": "2026-09-13",
-    "source_url": "https://ipindia.gov.in (official GI Registry portal; exact section not pinpointed)",
+    "retrieved_date": "2026-09-26",
+    "source_url": "https://www.indiacode.nic.in/handle/123456789/1981 (India Code — Geographical Indications of Goods (Registration and Protection) Act, 1999, Act No. 48 of 1999)",
     "authority": "Government of India / GI Registry",
-    "precision": "act-level summary; verify before production use"
+    "precision": "act-level, confirmed live Act landing page on India Code; exact section anchor not offered by the site"
   },
   {
     "id": "INTL-TRIPS-27",
@@ -162,10 +162,10 @@
     "section": "General framework (registration and protection of trademarks)",
     "summary": "Governs registration and protection of trademarks in India, including product/brand names and logos used for Ayurvedic products, administered by the Trade Marks Registry under the Controller General of Patents, Designs and Trade Marks (CGPDTM).",
     "version_date": "1999, as amended",
-    "retrieved_date": "2026-09-13",
-    "source_url": "https://ipindia.gov.in (Trade Marks Registry — official portal; exact section not pinpointed)",
+    "retrieved_date": "2026-09-26",
+    "source_url": "https://www.indiacode.nic.in/handle/123456789/1993 (India Code — Trade Marks Act, 1999, Act No. 47 of 1999)",
     "authority": "Government of India / Trade Marks Registry",
-    "precision": "act-level summary; verify exact section before production use"
+    "precision": "act-level, confirmed live Act landing page on India Code; exact section anchor not offered by the site"
   },
   {
     "id": "IN-COPYRIGHT-1957",
@@ -176,10 +176,10 @@
     "section": "General framework (literary, artistic and other original works)",
     "summary": "Governs copyright protection for original literary, artistic and other works in India; relevant to original written/illustrated material created around an Ayurvedic product (packaging text, manuals), while ancient classical Ayurvedic texts themselves are generally in the public domain due to their age.",
     "version_date": "1957, as amended",
-    "retrieved_date": "2026-09-13",
-    "source_url": "https://copyright.gov.in (Copyright Office — official portal; exact section not pinpointed)",
+    "retrieved_date": "2026-09-26",
+    "source_url": "https://www.indiacode.nic.in/handle/123456789/1367 (India Code — Copyright Act, 1957, Act No. 14 of 1957)",
     "authority": "Government of India / Copyright Office",
-    "precision": "act-level summary; verify exact section before production use"
+    "precision": "act-level, confirmed live Act landing page on India Code; exact section anchor not offered by the site"
   },
   {
     "id": "IN-DESIGNS-2000",
@@ -190,10 +190,10 @@
     "section": "General framework (registration of industrial designs)",
     "summary": "Governs registration of industrial designs in India — the visual, non-functional features of shape, configuration, pattern or ornamentation applied to an article — relevant to distinctive product/packaging shapes for Ayurvedic products.",
     "version_date": "2000, as amended",
-    "retrieved_date": "2026-09-13",
-    "source_url": "https://ipindia.gov.in (Designs Wing — official portal; exact section not pinpointed)",
+    "retrieved_date": "2026-09-26",
+    "source_url": "https://www.wipo.int/wipolex/en/legislation/details/2398 (WIPO Lex — The Designs Act, 2000, Act No. 16 of 2000; used in place of an India Code handle, which was not confirmed)",
     "authority": "Government of India / Patent Office (Designs Wing)",
-    "precision": "act-level summary; verify exact section before production use"
+    "precision": "act-level, confirmed on WIPO Lex's official legislative database; not cross-checked against India Code"
   },
   {
     "id": "IN-PPVFR-2001",
@@ -204,10 +204,10 @@
     "section": "General framework (plant variety registration and farmers' rights)",
     "summary": "India's sui generis plant variety protection regime — an alternative to patenting for plant varieties, as permitted under TRIPS Article 27.3(b) — relevant where an Ayurvedic product relies on a specific cultivated medicinal plant variety. Also protects farmers' rights over traditional varieties.",
     "version_date": "2001, as amended",
-    "retrieved_date": "2026-09-13",
-    "source_url": "https://plantauthority.gov.in (PPV&FR Authority — official portal; exact section not pinpointed)",
+    "retrieved_date": "2026-09-26",
+    "source_url": "https://www.indiacode.nic.in/handle/123456789/1909 (India Code — Protection of Plant Varieties and Farmers' Rights Act, 2001, Act No. 53 of 2001)",
     "authority": "Government of India / Protection of Plant Varieties and Farmers' Rights Authority",
-    "precision": "act-level summary; verify exact section before production use"
+    "precision": "act-level, confirmed live Act landing page on India Code; exact section anchor not offered by the site"
   },
   {
     "id": "IN-DMR-1954",
@@ -218,10 +218,10 @@
     "section": "General framework (prohibition of objectionable/misleading drug advertisements)",
     "summary": "Prohibits advertisements that make misleading claims about a drug's efficacy, including claims of magical or miraculous properties — directly relevant to how classical, proprietary or new Ayurvedic formulations may be marketed and advertised in India.",
     "version_date": "1954, as amended",
-    "retrieved_date": "2026-09-13",
-    "source_url": "https://main.ayush.gov.in / https://cdsco.gov.in (official portals; exact section not pinpointed)",
+    "retrieved_date": "2026-09-26",
+    "source_url": "https://www.indiacode.nic.in/handle/123456789/1412 (India Code — Drugs and Magic Remedies (Objectionable Advertisements) Act, 1954, Act No. 21 of 1954)",
     "authority": "Government of India",
-    "precision": "act-level summary; verify exact section before production use"
+    "precision": "act-level, confirmed live Act landing page on India Code; exact section anchor not offered by the site"
   },
   {
     "id": "IN-LM-2011",
@@ -232,10 +232,10 @@
     "section": "General framework (mandatory package declarations)",
     "summary": "Sets mandatory labelling declarations for pre-packaged commodities in India — net quantity, manufacturer/packer details, maximum retail price, month/year of manufacture — applicable to packaged Ayurvedic products regardless of their drug/cosmetic/food classification.",
     "version_date": "2011, as amended",
-    "retrieved_date": "2026-09-13",
-    "source_url": "https://consumeraffairs.nic.in (Department of Consumer Affairs — official portal; exact rule not pinpointed)",
+    "retrieved_date": "2026-09-26",
+    "source_url": "https://upload.indiacode.nic.in/showfile?actid=AC_CEN_21_44_00007_201001_1517807327712&filename=lm_packaged_commodities_rules_2011.pdf&type=rule (India Code — Legal Metrology (Packaged Commodities) Rules, 2011, direct PDF)",
     "authority": "Government of India / Department of Consumer Affairs",
-    "precision": "rules-level summary; exact rule number not pinpointed, verify before production use"
+    "precision": "rules-level, confirmed direct PDF on India Code's own upload host"
   },
   {
     "id": "IN-FSSA-2006",
@@ -246,10 +246,10 @@
     "section": "General framework (establishing FSSAI and the food-safety regulatory scheme)",
     "summary": "The parent statute establishing the Food Safety and Standards Authority of India (FSSAI) and the overall food-safety regulatory framework under which the 2016 health-supplement/nutraceutical regulations (see IN-FSSAI-2016) were subsequently made.",
     "version_date": "2006, as amended",
-    "retrieved_date": "2026-09-13",
-    "source_url": "https://fssai.gov.in (official portal; exact section not pinpointed)",
+    "retrieved_date": "2026-09-26",
+    "source_url": "https://www.indiacode.nic.in/handle/123456789/2027 (India Code — Food Safety and Standards Act, 2006, Act No. 34 of 2006)",
     "authority": "Government of India / Food Safety and Standards Authority of India",
-    "precision": "act-level summary; verify exact section before production use"
+    "precision": "act-level, confirmed live Act landing page on India Code; exact section anchor not offered by the site"
   },
   {
     "id": "INTL-WIPO-CONV-1967",
@@ -372,10 +372,10 @@
     "section": "General framework (deposit of micro-organisms as part of patent disclosure)",
     "summary": "Allows a patent applicant to satisfy the disclosure requirement for an invention involving a micro-organism (e.g. a fermentation strain, probiotic culture, or microbial biotransformation step used in an Ayurvedic/phytopharmaceutical process) by depositing a sample with a single International Depositary Authority, recognised by all member states, instead of depositing separately in every country where protection is sought. Relevant to Ayurvedic inventions where the novel/inventive element is a specific microbial strain or fermentation process rather than the herbal substance itself.",
     "version_date": "1977, as amended 1980",
-    "retrieved_date": "2026-09-17",
-    "source_url": "https://www.wipo.int/en/web/budapest-treaty (WIPO — official treaty portal)",
+    "retrieved_date": "2026-09-26",
+    "source_url": "https://www.wipo.int/wipolex/en/text/283784 (WIPO Lex — Budapest Treaty on the International Recognition of the Deposit of Microorganisms for the Purposes of Patent Procedure, 1977; per-article anchors available, e.g. #P120_14461 for Art. 9(1)(a))",
     "authority": "World Intellectual Property Organization (WIPO)",
-    "precision": "treaty-level, general framework; International Depositary Authority list and country-specific procedure not verified — verify before production use"
+    "precision": "article-level, confirmed on WIPO's own treaty text database with working per-article anchors"
   },
   {
     "id": "IN-PAT-RULES-2024",
@@ -386,10 +386,10 @@
     "section": "Rule 24B (Request for Examination timeline); Rule 12 (Form 3 filing); Rule 131 (Form 27 working statement); Certificate of Inventorship provisions",
     "summary": "Notified 15 March 2024 (with the Patents (Second Amendment) Rules, 2024 notified 16 March 2024), amending the Patents Rules, 2003. Key changes relevant to an Ayurvedic applicant: the timeline for filing a Request for Examination is reduced from 48 months to 31 months from the priority date; a single updated Form 3 (details of corresponding foreign applications) can now be filed once after the First Examination Report instead of repeatedly; the statement of commercial working of a patent (Form 27) is now required once per three-financial-year period instead of annually; and a new 'Certificate of Inventorship' formally recognises named inventors.",
     "version_date": "notified 15 March 2024 and 16 March 2024, in force from date of Gazette publication",
-    "retrieved_date": "2026-09-17",
-    "source_url": "https://ipindia.gov.in (Office of the Controller General of Patents, Designs & Trade Marks — official portal; exact rule text should be verified against the Gazette notification before production use)",
+    "retrieved_date": "2026-09-26",
+    "source_url": "https://www.wipo.int/wipolex/en/legislation/details/23105 (WIPO Lex — The Patents (Amendment) Rules, 2024, India; notified in the Official Gazette 15 March 2024)",
     "authority": "Government of India / Department for Promotion of Industry and Internal Trade, Ministry of Commerce and Industry",
-    "precision": "rule-level summary of publicly reported changes; exact rule numbering verified against secondary legal-analysis sources, not the primary Gazette text — verify before production use"
+    "precision": "rule-level, confirmed on WIPO Lex; India Code/IPO gazette PDF filename was found in secondary sources but not independently confirmed"
   },
   {
     "id": "IN-BD-RULES-2024",
@@ -400,9 +400,9 @@
     "section": "General framework (access/usage approval procedure), Section 3(2)(c)(ii) definitional cross-reference",
     "summary": "Notified 22 October 2024, in force from 22 December 2024, superseding the Biological Diversity Rules, 2004, to implement the Biological Diversity (Amendment) Act, 2023 (in force from 1 April 2024). Simplifies and moves online the procedures (including fee payment) for approval to access and use biological resources obtained from India, with separate, clearer forms and fees depending on the purpose of use. Gives the Chairperson of the National Biodiversity Authority power to expedite approvals during emergencies such as epidemics or pandemics. Works together with the Amendment Act's narrower redefinition of a 'foreign-controlled' Indian entity (Section 3(2)(c)(ii): now based on control under the Companies Act, 2013 rather than any non-Indian shareholding), which determines whether an Ayurvedic manufacturer needs NBA approval at all before commercial use, research, or filing a patent application involving an Indian biological resource.",
     "version_date": "notified 22 October 2024, in force from 22 December 2024",
-    "retrieved_date": "2026-09-17",
-    "source_url": "https://nbaindia.org (National Biodiversity Authority — official portal; exact rule text should be verified against the Gazette notification before production use)",
+    "retrieved_date": "2026-09-26",
+    "source_url": "https://www.wipo.int/wipolex/en/legislation/details/23135 (WIPO Lex — The Biological Diversity Rules, 2024, India; notified by MoEFCC 22 October 2024)",
     "authority": "Government of India / National Biodiversity Authority",
-    "precision": "rule-level summary of publicly reported changes; exact rule numbering not independently verified against the primary Gazette text — verify before production use"
+    "precision": "rule-level, confirmed on WIPO Lex (bilingual Hindi/English text, English begins page 50)"
   }
 ]

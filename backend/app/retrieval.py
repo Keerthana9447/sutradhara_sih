@@ -1,20 +1,34 @@
 """
 Retrieval layer.
 
-Primary path: sentence-transformer embeddings + FAISS (per the brief's RAG
-upgrade request). Two per-jurisdiction FAISS IndexFlatIP indices are built
-over L2-normalized embeddings (inner product on normalized vectors = cosine
-similarity), so jurisdiction filtering is structural — an India query
-physically cannot touch the International index, not just post-filtered.
+Primary path: dense BGE embeddings (BAAI/bge-small-en-v1.5) + FAISS. The
+embedding model runs through `fastembed` (Qdrant's library), which executes
+the model via ONNX Runtime — deliberately NOT sentence-transformers/torch.
+Torch alone is a multi-GB install and materially slows cold starts on small
+hosting tiers (e.g. Render's free/starter plans); fastembed's dependency
+stack (onnxruntime, tokenizers, huggingface-hub) is CPU-only and far
+lighter, with no other change in behavior for this file. Two
+per-jurisdiction FAISS IndexFlatIP indices are built over L2-normalized
+embeddings (inner product on normalized vectors = cosine similarity), so
+jurisdiction filtering is structural — an India query physically cannot
+touch the International index, not just post-filtered.
+
+BGE is an *asymmetric* embedding model: it was trained expecting a fixed
+instruction prefix on the QUERY side only ("Represent this sentence for
+searching relevant passages: "), while documents/passages are embedded with
+no prefix at all. Skipping this halves the model's effective retrieval
+quality versus what BAAI's own benchmarks report, so `_retrieve_embeddings`
+applies it to every query variant before encoding, and `_try_init_embeddings`
+deliberately does NOT apply it when encoding the corpus.
 
 Fallback path: the original TF-IDF retrieval (kept verbatim, renamed
 `_retrieve_tfidf`). This is not a toy fallback — it is what actually runs in
-any environment without live internet access to download the embedding
-model from the Hugging Face Hub on first use (e.g. this project's own build
+any environment without live internet access to download the ONNX model
+files from the Hugging Face Hub on first use (e.g. this project's own build
 sandbox), and it is what the automated test suite exercises. In a normal
-internet-connected dev/demo machine, the model downloads once (~90MB, cached
-locally by sentence-transformers afterwards) and the embeddings path takes
-over transparently — no config flag to flip, no API change either way.
+internet-connected dev/demo machine, the model downloads once (~130MB,
+cached locally by fastembed afterwards) and the embeddings path takes over
+transparently — no config flag to flip, no API change either way.
 
 `retrieve()` keeps the exact same signature and return shape regardless of
 which backend served the request: List[dict] with a `relevance_score` field
@@ -43,15 +57,17 @@ _CORPUS_BY_ID = {doc["id"]: doc for doc in _CORPUS}
 _DOC_TEXTS = [f"{d['title']} {d['section']} {d['summary']} {d['domain']}" for d in _CORPUS]
 
 # Retrieval-floor / domain-boost constants differ by backend: cosine
-# similarity from a general-purpose sentence embedding model sits on a
-# noticeably higher baseline (~0.15-0.35) for *unrelated* text than sparse
-# TF-IDF does, because embeddings encode broad topical/semantic proximity,
-# not just shared vocabulary. Reusing the TF-IDF thresholds unchanged would
-# let more irrelevant documents pass the abstention floor. These embedding
+# similarity from a dense embedding model sits on a noticeably higher
+# baseline (~0.15-0.35) for *unrelated* text than sparse TF-IDF does,
+# because embeddings encode broad topical/semantic proximity, not just
+# shared vocabulary. Reusing the TF-IDF thresholds unchanged would let more
+# irrelevant documents pass the abstention floor. These embedding
 # thresholds are a reasoned starting point, not empirically tuned against
 # live model output — this sandbox cannot reach the Hugging Face Hub to
 # download the model and verify real score distributions (see EMBEDDINGS
-# section below). Revisit once you can run this end-to-end with internet.
+# section below). Revisit once you can run this end-to-end with internet;
+# BGE's score distribution is broadly similar to other BERT-family sentence
+# embedding models but has not itself been measured here.
 _TFIDF_RELEVANCE_FLOOR = 0.05
 _TFIDF_DOMAIN_BOOST_GATE = 0.02
 _TFIDF_DOMAIN_BOOST = 0.15
@@ -60,7 +76,26 @@ _EMB_RELEVANCE_FLOOR = 0.30
 _EMB_DOMAIN_BOOST_GATE = 0.20
 _EMB_DOMAIN_BOOST = 0.10
 
-_EMBEDDING_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
+# BAAI/bge-small-en-v1.5: 384-dim, ~130MB ONNX weights via fastembed. Small
+# variant chosen deliberately over bge-base/bge-large for faster cold starts
+# and lower memory on small hosting tiers — swap the string below (and
+# redeploy) if you have headroom for better recall and want to trade up.
+_EMBEDDING_MODEL_NAME = "BAAI/bge-small-en-v1.5"
+
+# BGE is asymmetric: only queries get this instruction prefix; passages/docs
+# never do. This exact string is BAAI's documented instruction for
+# retrieval tasks with this model family — see the model card.
+_BGE_QUERY_INSTRUCTION = "Represent this sentence for searching relevant passages: "
+
+
+def _l2_normalize(mat: np.ndarray) -> np.ndarray:
+    """Row-wise L2 normalize so FAISS IndexFlatIP (inner product) behaves as
+    exact cosine similarity. Applied explicitly rather than trusted to the
+    embedding library, since that guarantee is what jurisdiction-isolation
+    and the relevance-floor thresholds below both depend on."""
+    norms = np.linalg.norm(mat, axis=1, keepdims=True)
+    norms[norms == 0] = 1.0
+    return mat / norms
 
 
 def _light_stem(token: str) -> str:
@@ -99,12 +134,12 @@ _JUR_DOC_IDS: Dict[str, List[int]] = {}  # per-jurisdiction: FAISS row -> global
 
 def _try_init_embeddings() -> bool:
     """
-    Attempt to load the sentence-transformer model and build per-jurisdiction
-    FAISS indices. Returns True on success. Any failure (missing packages,
-    no internet to fetch the model from the Hugging Face Hub, corrupted
-    cache, etc.) is caught broadly and logged — this must never crash
-    startup; the TF-IDF path above is already fully built and ready to serve
-    every request on its own.
+    Attempt to load the BGE ONNX model (via fastembed) and build
+    per-jurisdiction FAISS indices. Returns True on success. Any failure
+    (missing packages, no internet to fetch the model from the Hugging Face
+    Hub, corrupted cache, etc.) is caught broadly and logged — this must
+    never crash startup; the TF-IDF path above is already fully built and
+    ready to serve every request on its own.
     """
     global _EMBED_MODEL, _FAISS_INDEX_BY_JUR, _JUR_DOC_IDS
 
@@ -114,15 +149,17 @@ def _try_init_embeddings() -> bool:
 
     try:
         import faiss
-        from sentence_transformers import SentenceTransformer
+        from fastembed import TextEmbedding
     except ImportError as e:
         logger.warning("Embeddings backend unavailable (missing package): %r. Using TF-IDF.", e)
         return False
 
     try:
-        model = SentenceTransformer(_EMBEDDING_MODEL_NAME)
-        doc_embeddings = model.encode(_DOC_TEXTS, normalize_embeddings=True, show_progress_bar=False)
-        doc_embeddings = np.asarray(doc_embeddings, dtype="float32")
+        model = TextEmbedding(model_name=_EMBEDDING_MODEL_NAME)
+        # No instruction prefix here — only queries get one (see module
+        # docstring). `.embed()` returns a generator of 1D np.ndarrays.
+        doc_embeddings = np.asarray(list(model.embed(_DOC_TEXTS)), dtype="float32")
+        doc_embeddings = _l2_normalize(doc_embeddings)
 
         index_by_jur: Dict[str, Any] = {}
         ids_by_jur: Dict[str, List[int]] = {}
@@ -164,8 +201,11 @@ def _retrieve_embeddings(variants: List[str], jurisdiction: str, areas: List[str
     if index is None or not row_ids:
         return []
 
-    query_vecs = _EMBED_MODEL.encode(variants, normalize_embeddings=True, show_progress_bar=False)
-    query_vecs = np.asarray(query_vecs, dtype="float32")
+    # BGE instruction prefix goes on every query variant, never on documents
+    # (see module docstring) — skipping this measurably hurts recall.
+    prefixed_variants = [_BGE_QUERY_INSTRUCTION + v for v in variants]
+    query_vecs = np.asarray(list(_EMBED_MODEL.embed(prefixed_variants)), dtype="float32")
+    query_vecs = _l2_normalize(query_vecs)
 
     k = min(len(row_ids), max(top_k * 3, 10))
     all_scores, all_idx = index.search(query_vecs, k)  # each: (num_variants, k)

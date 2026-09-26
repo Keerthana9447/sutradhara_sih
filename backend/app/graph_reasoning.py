@@ -16,24 +16,27 @@ market, `reason()` chains:
 
 into a single explained path, each hop grounded in a real corpus entry id
 (never an invented node). This is the "relational knowledge graph and
-agentic, multi-source orchestration" the brief asks for, implemented as an
-honest in-memory traversal over the existing corpus rather than standing up
-a real Neo4j server — this sandbox has no route to a Neo4j/Aura endpoint to
-test against (same network constraint noted in registry_lookup.py and
-retrieval.py), and graph/schema.cypher already documents the intended
-production schema. Swapping this module's traversal for real Cypher queries
-against that schema is a mechanical follow-up once a Neo4j instance is
-reachable; the node/edge/path shape returned here matches that schema
-exactly so the swap doesn't change the API contract.
+agentic, multi-source orchestration" the brief asks for.
+
+Document lookups for each hop are delegated to graph_store.docs_for_area(),
+which transparently runs against a live Neo4j instance when one is
+configured and reachable (NEO4J_URI/NEO4J_USER/NEO4J_PASSWORD set, `neo4j`
+package installed, connection verified at startup — see graph_store.py),
+and falls back to the same in-memory list lookup this module used to do
+inline otherwise. graph/schema.cypher documents the production schema that
+graph_store.py's Neo4j sync mirrors exactly, so the node/edge/path shape
+returned here is identical regardless of which backend actually served the
+request — check `graph_store.GRAPH_BACKEND` (also surfaced at GET
+/api/health as `graph_backend`) to see which one is live.
 """
 from typing import Any, Dict, List, Optional
 
+from . import graph_store
 from . import jurisdiction as jurisdiction_module
-from . import retrieval
 
 
 def _docs_for_area(area: str, jur: str, limit: int = 2) -> List[Dict[str, Any]]:
-    return [d for d in retrieval._CORPUS if d["domain"] == area and d["jurisdiction"] == jur][:limit]
+    return graph_store.docs_for_area(area, jur, limit)
 
 
 def reason(category: str, jur: str, export_intent: bool = False) -> Dict[str, Any]:
@@ -126,9 +129,11 @@ def reason(category: str, jur: str, export_intent: bool = False) -> Dict[str, An
         "nodes": nodes,
         "edges": edges,
         "steps": steps,
+        "graph_backend": graph_store.GRAPH_BACKEND,
         "note": (
-            "In-memory multi-hop traversal over the current corpus (see module docstring); "
-            "the node/edge shape mirrors graph/schema.cypher so this can be swapped for real "
-            "Cypher queries against a live Neo4j instance without changing this API's response shape."
+            f"Multi-hop traversal served by the '{graph_store.GRAPH_BACKEND}' backend (see "
+            "graph_store.py). The node/edge shape mirrors graph/schema.cypher regardless of "
+            "which backend is active, so this response is identical whether or not a live Neo4j "
+            "instance is configured."
         ),
     }

@@ -1,0 +1,52 @@
+services:
+  - type: web
+    name: sutradhara-backend
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    envVars:
+      - key: CORS_ORIGINS
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_MODEL
+        value: openai/gpt-oss-120b
+      - key: SUTRADHARA_ADMIN_CODE
+        sync: false
+      - key: ENABLE_LLM_PARAPHRASE
+        value: "true"
+      - key: SUTRADHARA_DISABLE_EMBEDDINGS
+        value: "1"
+      - key: GROQ_TIMEOUT_SECONDS
+        value: "8"
+      # A single Bhashini/ULCA account's credentials cover translation
+      # (NMT), speech-to-text (ASR) and text-to-speech (TTS) together in
+      # the normal case — set just these two and every provider's own
+      # credential-fallback chain (translate.py's _bhashini_credentials(),
+      # asr.py's _bhashini_asr_credentials() / _bhashini_tts_credentials())
+      # picks them up automatically. Only add the *_NMT_/*_ASR_/*_TTS_
+      # prefixed variants below if you're later issued genuinely separate
+      # per-task credentials and want to override the shared pair for one
+      # task specifically.
+      - key: BHASHINI_USER_ID
+        sync: false
+      - key: BHASHINI_API_KEY
+        sync: false
+      # Optional per-task overrides — leave unset if BHASHINI_USER_ID /
+      # BHASHINI_API_KEY above already covers all three.
+      - key: BHASHINI_NMT_USER_ID
+        sync: false
+      - key: BHASHINI_NMT_API_KEY
+        sync: false
+      - key: BHASHINI_ASR_USER_ID
+        sync: false
+      - key: BHASHINI_ASR_API_KEY
+        sync: false
+      - key: BHASHINI_TTS_USER_ID
+        sync: false
+      - key: BHASHINI_TTS_API_KEY
+        sync: false
+      - key: SARVAM_API_KEY
+        sync: false

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Mic, Square, Loader2, AlertCircle } from 'lucide-react'
 import { api } from '../api'
+import { deliverVoiceTranscript } from './voiceInputTarget'
 
 const LOCALES = {
   en: 'en-IN',
@@ -172,7 +173,7 @@ export default function MicButton({ sourceLanguage, onTranscribed, copy, consent
       recognition.onend = () => {
         const text = finalTextRef.current
         if (text) {
-          onTranscribed(text)
+          deliverVoiceTranscript(text, onTranscribed)
           setState('idle')
         } else if (state !== 'error') {
           setErrorMsg(copy.micTranscribeFailed)
@@ -236,7 +237,7 @@ export default function MicButton({ sourceLanguage, onTranscribed, copy, consent
             external_processing_consent: true,
           })
           if (res.transcribed_ok && res.text) {
-            onTranscribed(res.text)
+            deliverVoiceTranscript(res.text, onTranscribed)
             setState('idle')
             return
           }

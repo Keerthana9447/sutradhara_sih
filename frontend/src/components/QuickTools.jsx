@@ -6,6 +6,7 @@ import SourceCard from './SourceCard'
 import MicButton from './MicButton'
 import ReadAloudButton from './ReadAloudButton'
 import { EmptyPlate, LeafSprig, ManuscriptRule } from './Botanical'
+import { rememberVoiceInput } from './voiceInputTarget'
 
 /**
  * Standalone, single-purpose tools that expose individual pipeline
@@ -59,6 +60,13 @@ function QueryBox({
       <textarea
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        onFocus={(e) =>
+          rememberVoiceInput(e.currentTarget, (text) =>
+            onChange((previous) =>
+              previous.trim() ? `${previous.trim()} ${text}` : text
+            )
+          )
+        }
         placeholder={placeholder}
         rows={3}
         className="research-input w-full min-h-24 border border-hairline rounded-md px-4 py-3 text-sm leading-relaxed focus:outline-none"
@@ -79,7 +87,9 @@ function QueryBox({
             sourceLanguage={language}
             copy={copy}
             onTranscribed={(text) =>
-              onChange(value.trim() ? `${value.trim()} ${text}` : text)
+              onChange((previous) =>
+                previous.trim() ? `${previous.trim()} ${text}` : text
+              )
             }
           />
 

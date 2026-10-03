@@ -40,6 +40,7 @@ import Hero from './components/Hero'
 import EvidenceBoundary from './components/EvidenceBoundary'
 import Logo from './components/Logo'
 import MicButton from './components/MicButton'
+import { rememberVoiceInput } from './components/voiceInputTarget'
 import ReadAloudButton from './components/ReadAloudButton'
 import { ABSTool, TKDLTool } from './components/QuickTools'
 import AmbientField from './components/Ambient'
@@ -765,6 +766,13 @@ export default function App() {
                     id="sutradhara-query"
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
+                    onFocus={(e) =>
+                      rememberVoiceInput(e.currentTarget, (text) =>
+                        setQuery((prev) =>
+                          prev.trim() ? `${prev.trim()} ${text}` : text
+                        )
+                      )
+                    }
                     placeholder={copy.placeholder}
                     rows={3}
                     className="research-input w-full min-h-28 border border-hairline rounded-md px-4 py-3 text-sm leading-relaxed focus:outline-none"
@@ -777,10 +785,34 @@ export default function App() {
                       </select>
                     </label>
                     <label className="text-xs text-ink/60">{copy.profileIngredients}
-                      <input value={profileIngredients} onChange={(e) => setProfileIngredients(e.target.value)} placeholder={copy.profileIngredientsPlaceholder} className="mt-1 block w-full border border-hairline rounded px-3 py-2 bg-paper text-ink" />
+                      <input
+                        value={profileIngredients}
+                        onChange={(e) => setProfileIngredients(e.target.value)}
+                        onFocus={(e) =>
+                          rememberVoiceInput(e.currentTarget, (text) =>
+                            setProfileIngredients((prev) =>
+                              prev.trim() ? `${prev.trim()} ${text}` : text
+                            )
+                          )
+                        }
+                        placeholder={copy.profileIngredientsPlaceholder}
+                        className="mt-1 block w-full border border-hairline rounded px-3 py-2 bg-paper text-ink"
+                      />
                     </label>
                     <label className="text-xs text-ink/60">{copy.profileRegion}
-                      <input value={profileRegion} onChange={(e) => setProfileRegion(e.target.value)} placeholder={copy.profileRegionPlaceholder} className="mt-1 block w-full border border-hairline rounded px-3 py-2 bg-paper text-ink" />
+                      <input
+                        value={profileRegion}
+                        onChange={(e) => setProfileRegion(e.target.value)}
+                        onFocus={(e) =>
+                          rememberVoiceInput(e.currentTarget, (text) =>
+                            setProfileRegion((prev) =>
+                              prev.trim() ? `${prev.trim()} ${text}` : text
+                            )
+                          )
+                        }
+                        placeholder={copy.profileRegionPlaceholder}
+                        className="mt-1 block w-full border border-hairline rounded px-3 py-2 bg-paper text-ink"
+                      />
                     </label>
                   </div>
                   <label className="mt-3 flex items-start gap-2 text-xs leading-relaxed text-ink/60">
@@ -803,9 +835,7 @@ export default function App() {
                         copy={copy}
                         onTranscribed={(text) =>
                           setQuery((prev) =>
-                            prev.trim()
-                              ? `${prev.trim()} ${text}`
-                              : text
+                            prev.trim() ? `${prev.trim()} ${text}` : text
                           )
                         }
                       />

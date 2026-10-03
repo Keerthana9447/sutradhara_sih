@@ -8,11 +8,6 @@ class AnalyzeRequest(BaseModel):
     language: str = Field(default="en", description="'en', 'te', 'hi', 'ta', 'ml', or 'sa'")
     # Optional pre-confirmed classification (from the clarification step)
     confirmed_category: Optional[str] = None
-    # Optional: use the caller's own linked paid-subscription connector for
-    # this one query (see app/connectors.py). Every use is explicitly opt-in
-    # per request — never silently applied to every query just because a
-    # connector exists — and every use is logged.
-    use_connector_id: Optional[str] = None
     query_depth: Literal["quick", "guided", "deep"] = "guided"
 
 
@@ -80,10 +75,6 @@ class AnalyzeResponse(BaseModel):
     # applicable to this category, or when nothing cleared the similarity
     # floor — never padded with a weak match.
     tk_similarity: Optional[List[dict]] = None
-    # Present only when use_connector_id was set on the request AND the
-    # connector is active. Live provider results are kept separate from the
-    # legal corpus sources and are explicitly marked as live or simulated.
-    connector_source_used: Optional[dict] = None
     # Live, per-query explainability graph — built from what was ACTUALLY
     # retrieved for THIS query (see app/graph.py), distinct from the static
     # schema view at GET /api/graph and the manual what-if multi-hop tool at
@@ -216,30 +207,6 @@ class PostureRequest(BaseModel):
 
 
 # --------------------------------------------------------------------------
-# Paid-subscription connector (consent-logged, user-linked) — see connectors.py
-# --------------------------------------------------------------------------
-class ConnectorLinkRequest(BaseModel):
-    provider: str = Field(..., description="Provider name; 'USPTO PatentsView' enables the live US-patent adapter")
-    api_key: str = Field(..., description="Provider API key; PatentsView keys are encrypted at rest and never returned")
-    scope: str = Field(default="patent_search", description="What this connector may be used for")
-    contact_email: Optional[str] = None
-
-
-class ConnectorInfo(BaseModel):
-    connector_id: str
-    provider: str
-    scope: str
-    status: str  # "active" | "revoked"
-    linked_at: str
-    revoked_at: Optional[str] = None
-    key_fingerprint: str  # last 4 characters only — proves which key without exposing it
-
-
-class ConnectorRevokeRequest(BaseModel):
-    connector_id: str
-
-
-# --------------------------------------------------------------------------
 # Multi-hop graph reasoning — see graph_reasoning.py
 # --------------------------------------------------------------------------
 class GraphReasonRequest(BaseModel):
@@ -328,20 +295,6 @@ class SessionAnalyzeRequest(AnalyzeRequest):
     """Extends the standard analyze request with session tracking."""
     session_id: Optional[int] = None
     user_id: Optional[int] = None
-
-
-# --------------------------------------------------------------------------
-# Citizen Claims Submission Workflow — /api/v1/claims
-# --------------------------------------------------------------------------
-class ClaimSubmitRequest(BaseModel):
-    title: str = Field(..., min_length=1, max_length=300, description="Short title for the claim")
-    description: str = Field(..., min_length=1, max_length=12000, description="Detailed description of the formulation or TK")
-    jurisdiction: str = Field(default="India")
-    category: Optional[str] = Field(default=None, description="Product category if known")
-
-
-class ClaimIdRequest(BaseModel):
-    claim_id: str
 
 
 # --------------------------------------------------------------------------

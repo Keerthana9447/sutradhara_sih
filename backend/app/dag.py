@@ -12,7 +12,7 @@ the jurisdiction, add areas or sources, or write the legal answer.
         --(needs_clarification)--> clarification_response -> END
         --(else)-->                route_areas -> plan_research -> retrieve
                                     -> score_confidence
-                                    -> enrich_evidence -> use_connector
+                                    -> enrich_evidence
         --(abstained)-->           abstain_response -> END
         --(else)-->                build_answer -> paraphrase -> finalize_success -> END
 
@@ -38,7 +38,7 @@ import logging
 from typing import Any, Dict, List, Optional, TypedDict
 
 from . import (
-    answer, classifier, confidence, connectors, corpus_freshness, db, graph,
+    answer, classifier, confidence, corpus_freshness, db, graph,
     jurisdiction, language, llm, pathway, query_expansion, retrieval,
     tkdl_similarity, translate,
 )
@@ -54,7 +54,6 @@ class AnalyzeState(TypedDict, total=False):
     jurisdiction: str          # raw request value, e.g. "India"
     language: str              # requested output language
     confirmed_category: Optional[str]
-    use_connector_id: Optional[str]
     jur: str                   # resolved jurisdiction name (already validated by main.py)
 
     # --- produced along the way ---
@@ -76,7 +75,6 @@ class AnalyzeState(TypedDict, total=False):
     regulatory_pathway: List[str]
     tk_similarity: Any
     dynamic_graph: Optional[Dict[str, Any]]
-    connector_source_used: Optional[Dict[str, Any]]
     generated_answer: str
     used_llm: bool
     evidence_logged: bool
@@ -259,14 +257,6 @@ def _enrich_evidence(state: AnalyzeState) -> Dict[str, Any]:
     }
 
 
-def _use_connector(state: AnalyzeState) -> Dict[str, Any]:
-    # Optional source connector use — strictly opt-in per request
-    # and logged regardless of outcome. Never merged into `sources` —
-    # kept as a separately-tagged field.
-    connector_source_used = None
-    if state.get("use_connector_id"):
-        connector_source_used = connectors.use_connector(state["use_connector_id"], state["query"])
-    return {"connector_source_used": connector_source_used}
 
 
 def _log_evidence(state: AnalyzeState) -> Dict[str, Any]:
@@ -324,7 +314,6 @@ def _abstain_response(state: AnalyzeState) -> Dict[str, Any]:
         "retrieval_query": state["retrieval_query"] if state["retrieval_query"] != state["query"] else None,
         "regulatory_pathway": state["regulatory_pathway"],
         "tk_similarity": state["tk_similarity"],
-        "connector_source_used": state["connector_source_used"],
         "dynamic_graph": state["dynamic_graph"],
         "stale_sources_warning": corpus_freshness.build_staleness_warning(state["retrieved"]),
         "orchestration_mode": state.get("planning_mode", "deterministic_fallback"),
@@ -401,7 +390,6 @@ def _finalize_success(state: AnalyzeState) -> Dict[str, Any]:
         "llm_paraphrased": state["used_llm"],
         "regulatory_pathway": regulatory_pathway,
         "tk_similarity": state["tk_similarity"],
-        "connector_source_used": state["connector_source_used"],
         "dynamic_graph": state["dynamic_graph"],
         "stale_sources_warning": corpus_freshness.build_staleness_warning(state["retrieved"]),
         "orchestration_mode": state.get("planning_mode", "deterministic_fallback"),
@@ -431,7 +419,6 @@ def _build_langgraph():
     builder.add_node("retrieve", _retrieve)
     builder.add_node("score_confidence", _score_confidence)
     builder.add_node("enrich_evidence", _enrich_evidence)
-    builder.add_node("use_connector", _use_connector)
     builder.add_node("log_evidence", _log_evidence)
     builder.add_node("abstain_response", _abstain_response)
     builder.add_node("build_answer", _build_answer)
@@ -450,8 +437,7 @@ def _build_langgraph():
     builder.add_edge("plan_research", "retrieve")
     builder.add_edge("retrieve", "score_confidence")
     builder.add_edge("score_confidence", "enrich_evidence")
-    builder.add_edge("enrich_evidence", "use_connector")
-    builder.add_edge("use_connector", "log_evidence")
+    builder.add_edge("enrich_evidence", "log_evidence")
     builder.add_conditional_edges(
         "log_evidence", _abstained_branch,
         {"abstain": "abstain_response", "continue": "build_answer"},
@@ -493,7 +479,6 @@ def _run_sequential(state: AnalyzeState) -> AnalyzeState:
     state.update(_retrieve(state))
     state.update(_score_confidence(state))
     state.update(_enrich_evidence(state))
-    state.update(_use_connector(state))
     state.update(_log_evidence(state))
 
     if _abstained_branch(state) == "abstain":
@@ -510,9 +495,9 @@ def run_analyze_pipeline(initial_state: Dict[str, Any]) -> Dict[str, Any]:
     """
     Entry point used by main.py. `initial_state` must already contain
     `query`, `jurisdiction`, `language`, `confirmed_category`,
-    `use_connector_id`, and `jur` (the already-resolved/validated
-    jurisdiction name — jurisdiction.resolve_jurisdiction's ValueError is
-    handled by the FastAPI layer before this is ever called).
+    and `jur` (the already-resolved/validated jurisdiction name —
+    jurisdiction.resolve_jurisdiction's ValueError is handled by the
+    FastAPI layer before this is ever called).
 
     Returns a plain dict with exactly the fields of schemas.AnalyzeResponse
     (minus defaulted ones), regardless of which backend executed the graph.

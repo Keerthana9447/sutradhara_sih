@@ -19,13 +19,12 @@ from fastapi import FastAPI, Header, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 
 from . import jurisdiction, retrieval, db, translate, posture_pdf
-from . import graph_reasoning, eval_runner, connectors, graph, asr, dag
+from . import graph_reasoning, eval_runner, graph, asr, dag
 from . import corpus_freshness, privacy, registry_lookup, graph_store, gi_registry, auth, bias_audit
-from . import claims_workflow, radar, ocr_digitize, admin_auth, patents_registry, features
+from . import radar, ocr_digitize, admin_auth, patents_registry, features
 from .schemas import (
     AnalyzeRequest, AnalyzeResponse, SourceRef,
     EscalateRequest, FeedbackRequest, PostureRequest,
-    ConnectorLinkRequest, ConnectorInfo, ConnectorRevokeRequest,
     GraphReasonRequest, ASRRequest, ASRResponse, TTSRequest, TTSResponse,
     RegistryLookupRequest, PrivacyLookupRequest,
     ConsentRequestRequest, ConsentIdRequest, DPIARequest, BreachReportRequest,
@@ -33,7 +32,7 @@ from .schemas import (
     CorpusRefreshRequest, CorpusRefreshApproveRequest,
     SignUpRequest, SignInRequest, AuthResponse, UserInfo,
     ChatSessionCreate, ChatSessionRename, ChatMessageAdd, SessionAnalyzeRequest,
-    ClaimSubmitRequest, ClaimIdRequest, RadarRequest,
+    RadarRequest,
     OCRRequest, AdminSignUpRequest,
     TranslateBatchRequest,
 )
@@ -105,7 +104,6 @@ def analyze(req: AnalyzeRequest):
         "jurisdiction": req.jurisdiction,
         "language": req.language,
         "confirmed_category": req.confirmed_category,
-        "use_connector_id": req.use_connector_id,
         "query_depth": req.query_depth,
         "jur": jur,
     }
@@ -198,40 +196,6 @@ def eval_benchmark():
     labeled data/eval_dataset.json — see eval_runner.py docstring for what
     each number means and does not mean."""
     return eval_runner.run_benchmark(app)
-
-
-# --------------------------------------------------------------------------
-# Paid-subscription connector (consent-logged, user-linked) — see connectors.py
-# --------------------------------------------------------------------------
-@app.post("/api/connectors/link", response_model=ConnectorInfo)
-def link_connector(req: ConnectorLinkRequest):
-    try:
-        info = connectors.link_connector(req.provider, req.api_key, req.scope, req.contact_email)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except connectors.ConnectorConfigurationError as e:
-        raise HTTPException(status_code=503, detail=str(e))
-    return ConnectorInfo(**info)
-
-
-@app.post("/api/connectors/revoke")
-def revoke_connector(req: ConnectorRevokeRequest):
-    ok = connectors.revoke_connector(req.connector_id)
-    if not ok:
-        raise HTTPException(status_code=404, detail="Connector not found")
-    return {"status": "revoked", "connector_id": req.connector_id}
-
-
-@app.get("/api/connectors", response_model=List[ConnectorInfo])
-def list_connectors():
-    return [ConnectorInfo(**c) for c in connectors.list_connectors()]
-
-
-@app.get("/api/connectors/{connector_id}/usage")
-def connector_usage(connector_id: str):
-    if connectors.get_connector(connector_id) is None:
-        raise HTTPException(status_code=404, detail="Connector not found")
-    return {"connector_id": connector_id, "usage": connectors.usage_log_for(connector_id)}
 
 
 # --------------------------------------------------------------------------
@@ -739,71 +703,6 @@ def account_delete(authorization: Optional[str] = Header(default=None)):
     history, their login tokens, and escalations filed under their email."""
     user = _current_user(authorization)
     return {"status": "deleted", "deleted": privacy.delete_account(user["id"])}
-
-
-# ==========================================================================
-# Citizen Claims Submission Workflow — /api/v1/claims
-# ==========================================================================
-@app.post("/api/v1/claims")
-def submit_claim(req: ClaimSubmitRequest, request: Request, authorization: Optional[str] = Header(default=None)):
-    """Submit a formulated IP claim for tracking (Pending → Verified → Anchored)."""
-    user = _current_user(authorization)
-    if not auth.login_limiter.allow("claims|" + _client_key(request)):
-        raise HTTPException(status_code=429, detail="Too many claim submissions. Try again later.")
-    user_id = user["id"]
-    return claims_workflow.submit_claim(
-        req.title, req.description, req.jurisdiction, req.category, user_id
-    )
-
-
-@app.get("/api/v1/claims")
-def list_claims_endpoint(
-    status: Optional[str] = None,
-    limit: int = Query(default=50, ge=1, le=100),
-    authorization: Optional[str] = Header(default=None),
-):
-    """List claims. Authenticated citizens see their own; admins see all."""
-    user = _current_user(authorization)
-    role = admin_auth.get_user_role(user["id"])
-    uid = None if role == "admin" else user["id"]
-    return claims_workflow.list_claims(user_id=uid, status=status, limit=limit)
-
-
-@app.get("/api/v1/claims/{claim_id}")
-def get_claim_endpoint(claim_id: str, authorization: Optional[str] = Header(default=None)):
-    user = _current_user(authorization)
-    claim = claims_workflow.get_claim(claim_id)
-    if claim is None or (admin_auth.get_user_role(user["id"]) != "admin" and claim["user_id"] != user["id"]):
-        raise HTTPException(status_code=404, detail="Claim not found")
-    return claim
-
-
-@app.post("/api/v1/claims/{claim_id}/verify")
-def verify_claim_endpoint(claim_id: str, authorization: Optional[str] = Header(default=None)):
-    """Admin action: advance a Pending claim to Verified."""
-    user = _current_user(authorization)
-    try:
-        admin_auth.require_admin(user)
-    except PermissionError as e:
-        raise HTTPException(status_code=403, detail=str(e))
-    try:
-        return claims_workflow.verify_claim(claim_id)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-@app.post("/api/v1/claims/{claim_id}/anchor")
-def anchor_claim_endpoint(claim_id: str, authorization: Optional[str] = Header(default=None)):
-    """Admin action: anchor a Verified claim (simulated blockchain hash)."""
-    user = _current_user(authorization)
-    try:
-        admin_auth.require_admin(user)
-    except PermissionError as e:
-        raise HTTPException(status_code=403, detail=str(e))
-    try:
-        return claims_workflow.anchor_claim(claim_id)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
 
 
 # ==========================================================================

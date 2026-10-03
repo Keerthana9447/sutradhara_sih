@@ -40,11 +40,10 @@ import EvidenceBoundary from './components/EvidenceBoundary'
 import Logo from './components/Logo'
 import MicButton from './components/MicButton'
 import ReadAloudButton from './components/ReadAloudButton'
-import { ABSTool, TKDLTool, ConnectorTool } from './components/QuickTools'
+import { ABSTool, TKDLTool } from './components/QuickTools'
 import AmbientField from './components/Ambient'
 import { BotanicalCorner, ManuscriptRule } from './components/Botanical'
 import { navIcon, areaIcon } from './components/DomainIcons'
-import ClaimsWorkflow from './components/ClaimsWorkflow'
 import ManuscriptOCR from './components/ManuscriptOCR'
 import PatentsRegistry from './components/PatentsRegistry'
 import AdminDashboard from './components/AdminDashboard'
@@ -52,13 +51,13 @@ import LegalPages from './components/LegalPages'
 
 // 'workspace' and 'compliance' are parent tabs — each capability lives in
 // the matching secondary tab bar rather than the primary navigation.
-const CITIZEN_NAV = ['analyze', 'workspace', 'compliance', 'graph', 'connectors', 'eval', 'legal']
-const ADMIN_NAV   = ['analyze', 'admin', 'workspace', 'compliance', 'graph', 'connectors', 'eval', 'legal']
+const CITIZEN_NAV = ['analyze', 'workspace', 'compliance', 'graph', 'eval', 'legal']
+const ADMIN_NAV   = ['analyze', 'admin', 'workspace', 'compliance', 'graph', 'eval', 'legal']
 
 // Sub-tabs for each parent, in display order. Components rendered for each
 // value are unchanged from before this consolidation — see the render
 // block below.
-const WORKSPACE_SUBTABS = ['claims', 'ocr', 'registry']
+const WORKSPACE_SUBTABS = ['ocr', 'registry']
 const COMPLIANCE_SUBTABS = ['abs', 'tkdl']
 
 // Reverse lookup for the remaining workspace and compliance tabs.
@@ -71,9 +70,7 @@ const NAV_KEY = {
   abs: 'navAbs',
   tkdl: 'navTkdl',
   graph: 'navGraph',
-  connectors: 'navConnectors',
   eval: 'navEval',
-  claims: 'navClaims',
   ocr: 'navOcr',
   registry: 'navRegistry',
   legal: 'navLegal',
@@ -83,7 +80,6 @@ const NAV_KEY = {
 }
 
 const NAV_LABELS = {
-  claims: 'My Claims',
   ocr: 'Manuscript',
   registry: 'Registry',
   legal: 'Legal',
@@ -95,7 +91,6 @@ const NAV_LABELS = {
 }
 
 const NAV_ICONS = {
-  claims: FileCheck2,
   ocr: BookImage,
   registry: Database,
   legal: Scale,
@@ -652,9 +647,6 @@ export default function App() {
               </>
             )}
 
-            {tab === 'connectors' && (
-              <ConnectorTool copy={copy} language={lang} />
-            )}
 
             {/* ── New feature tabs, grouped under Patent Workspace ── */}
             {tab === 'workspace' && (
@@ -666,9 +658,6 @@ export default function App() {
                   copy={copy}
                   labelOverrides={Object.fromEntries(Object.keys(NAV_LABELS).map((key) => [key, navLabel(key)]))}
                 />
-                {workspaceSubTab === 'claims' && (
-                  <ClaimsWorkflow copy={copy} language={lang} />
-                )}
                 {workspaceSubTab === 'ocr' && (
                   <ManuscriptOCR copy={copy} language={lang} />
                 )}

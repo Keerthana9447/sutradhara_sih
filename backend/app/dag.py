@@ -12,7 +12,7 @@ the jurisdiction, add areas or sources, or write the legal answer.
         --(needs_clarification)--> clarification_response -> END
         --(else)-->                route_areas -> plan_research -> retrieve
                                     -> score_confidence
-                                    -> enrich_evidence
+                                    -> enrich_evidence -> use_connector
         --(abstained)-->           abstain_response -> END
         --(else)-->                build_answer -> paraphrase -> finalize_success -> END
 
@@ -38,9 +38,9 @@ import logging
 from typing import Any, Dict, List, Optional, TypedDict
 
 from . import (
-    answer, classifier, confidence, corpus_freshness, db, graph,
+    answer, classifier, confidence, connectors, corpus_freshness, db, graph,
     jurisdiction, language, llm, pathway, query_expansion, retrieval,
-    tkdl_similarity, translate,
+    tkdl_similarity, translate, privacy,
 )
 
 logger = logging.getLogger("ip_sakti.dag")
@@ -54,6 +54,7 @@ class AnalyzeState(TypedDict, total=False):
     jurisdiction: str          # raw request value, e.g. "India"
     language: str              # requested output language
     confirmed_category: Optional[str]
+    use_connector_id: Optional[str]
     jur: str                   # resolved jurisdiction name (already validated by main.py)
 
     # --- produced along the way ---
@@ -65,6 +66,7 @@ class AnalyzeState(TypedDict, total=False):
     research_plan: List[Dict[str, str]]
     planning_mode: str
     query_depth: str
+    external_processing_consent: bool
     retrieved: List[Dict[str, Any]]
     conf_score: float
     conf_label: str
@@ -75,6 +77,7 @@ class AnalyzeState(TypedDict, total=False):
     regulatory_pathway: List[str]
     tk_similarity: Any
     dynamic_graph: Optional[Dict[str, Any]]
+    connector_source_used: Optional[Dict[str, Any]]
     generated_answer: str
     used_llm: bool
     evidence_logged: bool
@@ -95,7 +98,11 @@ def _normalize_language(state: AnalyzeState) -> Dict[str, Any]:
     input_language = language.detect_language(state["query"])
     retrieval_query = state["query"]
     if input_language != "en":
-        translated, translated_ok = translate.translate_to_english(state["query"], input_language)
+        translated, translated_ok = (
+            translate.translate_to_english(state["query"], input_language)
+            if state.get("external_processing_consent", False)
+            else (state["query"], False)
+        )
         if translated_ok and translated.strip():
             retrieval_query = translated
         else:
@@ -150,6 +157,13 @@ def _route_areas(state: AnalyzeState) -> Dict[str, Any]:
 
 
 def _plan_research(state: AnalyzeState) -> Dict[str, Any]:
+    if not state.get("external_processing_consent", False):
+        return {"research_plan": [], "planning_mode": "deterministic_fallback"}
+    planner_configured = bool(llm._RESEARCH_PLANNER_ENABLED and llm.GROQ_API_KEY)
+    if planner_configured:
+        transfer = privacy.check_transfer("United States", "Groq research planning", ["query_text"])
+        if transfer["decision"] != "allowed":
+            return {"research_plan": [], "planning_mode": "deterministic_fallback"}
     if jurisdiction.has_unsupported_foreign_country(state["query"], state["jur"]):
         return {"research_plan": [], "planning_mode": "deterministic_fallback"}
 
@@ -257,6 +271,14 @@ def _enrich_evidence(state: AnalyzeState) -> Dict[str, Any]:
     }
 
 
+def _use_connector(state: AnalyzeState) -> Dict[str, Any]:
+    # Optional source connector use — strictly opt-in per request
+    # and logged regardless of outcome. Never merged into `sources` —
+    # kept as a separately-tagged field.
+    connector_source_used = None
+    if state.get("use_connector_id"):
+        connector_source_used = connectors.use_connector(state["use_connector_id"], state["query"])
+    return {"connector_source_used": connector_source_used}
 
 
 def _log_evidence(state: AnalyzeState) -> Dict[str, Any]:
@@ -292,10 +314,16 @@ def _resolve_output_language(state: AnalyzeState) -> str:
 def _abstain_response(state: AnalyzeState) -> Dict[str, Any]:
     db.log_audit(state["query"], state["jur"], state["classification"].category, state["conf_score"], True, state["retrieved"])
     lang = _resolve_output_language(state)
-    abstain_text, ok = translate.translate_text(
-        "Insufficient authoritative evidence to provide a reliable answer from the available corpus.",
-        lang,
+    abstain_text, ok = (
+        translate.translate_text(
+            "Insufficient authoritative evidence to provide a reliable answer from the available corpus.",
+            lang,
+        ) if state.get("external_processing_consent", False) else (
+            "Insufficient authoritative evidence to provide a reliable answer from the available corpus.", False
+        )
     )
+    if lang != "en" and not state.get("external_processing_consent", False):
+        lang = "en"
     response = {
         "classification": state["classification"],
         "jurisdiction": state["jur"],
@@ -314,6 +342,7 @@ def _abstain_response(state: AnalyzeState) -> Dict[str, Any]:
         "retrieval_query": state["retrieval_query"] if state["retrieval_query"] != state["query"] else None,
         "regulatory_pathway": state["regulatory_pathway"],
         "tk_similarity": state["tk_similarity"],
+        "connector_source_used": state["connector_source_used"],
         "dynamic_graph": state["dynamic_graph"],
         "stale_sources_warning": corpus_freshness.build_staleness_warning(state["retrieved"]),
         "orchestration_mode": state.get("planning_mode", "deterministic_fallback"),
@@ -334,7 +363,13 @@ def _paraphrase(state: AnalyzeState) -> Dict[str, Any]:
     # this can never introduce an uncited or fabricated claim. This is the
     # one step in the whole graph that can call an external LLM; it never
     # influences *which* node runs next, only the text of `generated_answer`.
-    generated_answer, used_llm = llm.paraphrase_answer(state["generated_answer"])
+    generated_answer, used_llm = (
+        llm.paraphrase_answer(state["generated_answer"])
+        if state.get("external_processing_consent", False)
+        and llm._ENABLED and llm.GROQ_API_KEY
+        and privacy.check_transfer("United States", "Groq answer paraphrasing", ["grounded_answer"])["decision"] == "allowed"
+        else (state["generated_answer"], False)
+    )
     logger.info("LLM_PARAPHRASE_APPLIED=%s", used_llm)
     return {"generated_answer": generated_answer, "used_llm": used_llm}
 
@@ -343,6 +378,8 @@ def _finalize_success(state: AnalyzeState) -> Dict[str, Any]:
     db.log_audit(state["query"], state["jur"], state["classification"].category, state["conf_score"], False, state["retrieved"])
 
     lang = _resolve_output_language(state)
+    if lang != "en" and not state.get("external_processing_consent", False):
+        lang = "en"
     generated_answer = state["generated_answer"]
     classification = state["classification"]
     tk_pointer = state["tk_pointer"]
@@ -390,6 +427,7 @@ def _finalize_success(state: AnalyzeState) -> Dict[str, Any]:
         "llm_paraphrased": state["used_llm"],
         "regulatory_pathway": regulatory_pathway,
         "tk_similarity": state["tk_similarity"],
+        "connector_source_used": state["connector_source_used"],
         "dynamic_graph": state["dynamic_graph"],
         "stale_sources_warning": corpus_freshness.build_staleness_warning(state["retrieved"]),
         "orchestration_mode": state.get("planning_mode", "deterministic_fallback"),
@@ -419,6 +457,7 @@ def _build_langgraph():
     builder.add_node("retrieve", _retrieve)
     builder.add_node("score_confidence", _score_confidence)
     builder.add_node("enrich_evidence", _enrich_evidence)
+    builder.add_node("use_connector", _use_connector)
     builder.add_node("log_evidence", _log_evidence)
     builder.add_node("abstain_response", _abstain_response)
     builder.add_node("build_answer", _build_answer)
@@ -437,7 +476,8 @@ def _build_langgraph():
     builder.add_edge("plan_research", "retrieve")
     builder.add_edge("retrieve", "score_confidence")
     builder.add_edge("score_confidence", "enrich_evidence")
-    builder.add_edge("enrich_evidence", "log_evidence")
+    builder.add_edge("enrich_evidence", "use_connector")
+    builder.add_edge("use_connector", "log_evidence")
     builder.add_conditional_edges(
         "log_evidence", _abstained_branch,
         {"abstain": "abstain_response", "continue": "build_answer"},
@@ -479,6 +519,7 @@ def _run_sequential(state: AnalyzeState) -> AnalyzeState:
     state.update(_retrieve(state))
     state.update(_score_confidence(state))
     state.update(_enrich_evidence(state))
+    state.update(_use_connector(state))
     state.update(_log_evidence(state))
 
     if _abstained_branch(state) == "abstain":
@@ -495,9 +536,9 @@ def run_analyze_pipeline(initial_state: Dict[str, Any]) -> Dict[str, Any]:
     """
     Entry point used by main.py. `initial_state` must already contain
     `query`, `jurisdiction`, `language`, `confirmed_category`,
-    and `jur` (the already-resolved/validated jurisdiction name —
-    jurisdiction.resolve_jurisdiction's ValueError is handled by the
-    FastAPI layer before this is ever called).
+    `use_connector_id`, and `jur` (the already-resolved/validated
+    jurisdiction name — jurisdiction.resolve_jurisdiction's ValueError is
+    handled by the FastAPI layer before this is ever called).
 
     Returns a plain dict with exactly the fields of schemas.AnalyzeResponse
     (minus defaulted ones), regardless of which backend executed the graph.

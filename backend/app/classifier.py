@@ -26,6 +26,7 @@ _KEYWORDS = {
         "charaka", "sushruta", "ashtanga", "shastra", "classical text",
         "traditional ayurvedic", "known formulation", "triphala",
         "geographical indication", "regional name", "traditionally made",
+        "national biodiversity authority",
     ],
     "Patent / Proprietary Medicine": [
         "proprietary", "patent medicine", "brand", "my own formula", "own formulation",

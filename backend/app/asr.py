@@ -173,8 +173,8 @@ def _bhashini_asr_credentials() -> Optional[tuple[str, str]]:
     # _bhashini_credentials() for the NMT (translation) provider.
     user_id = os.getenv("BHASHINI_ASR_USER_ID") or os.getenv("BHASHINI_USER_ID")
     api_key = os.getenv("BHASHINI_ASR_API_KEY") or os.getenv("BHASHINI_API_KEY")
-    if user_id and api_key and user_id.strip() and api_key.strip():
-        return user_id.strip(), api_key.strip()
+    if user_id and api_key:
+        return user_id, api_key
     return None
 
 
@@ -216,8 +216,10 @@ def _transcribe_via_bhashini(
         return None
     user_id, api_key = creds
 
-    raw_pid = os.getenv("BHASHINI_ASR_PIPELINE_ID") or os.getenv("BHASHINI_PIPELINE_ID") or _BHASHINI_DEFAULT_ASR_PIPELINE_ID
-    pipeline_id = raw_pid.strip()
+    pipeline_id = os.getenv(
+        "BHASHINI_ASR_PIPELINE_ID",
+        os.getenv("BHASHINI_PIPELINE_ID", _BHASHINI_DEFAULT_ASR_PIPELINE_ID),
+    )
     headers = {
         "Content-Type": "application/json",
         "userID": user_id,
@@ -328,8 +330,8 @@ def _bhashini_tts_credentials() -> Optional[tuple[str, str]]:
         or os.getenv("BHASHINI_ASR_API_KEY")
         or os.getenv("BHASHINI_API_KEY")
     )
-    if user_id and api_key and user_id.strip() and api_key.strip():
-        return user_id.strip(), api_key.strip()
+    if user_id and api_key:
+        return user_id, api_key
     return None
 
 
@@ -369,8 +371,10 @@ def _synthesize_via_bhashini(text: str, language: str) -> Optional[str]:
         return None
     user_id, api_key = creds
 
-    raw_pid = os.getenv("BHASHINI_TTS_PIPELINE_ID") or os.getenv("BHASHINI_PIPELINE_ID") or _BHASHINI_DEFAULT_TTS_PIPELINE_ID
-    pipeline_id = raw_pid.strip()
+    pipeline_id = os.getenv(
+        "BHASHINI_TTS_PIPELINE_ID",
+        os.getenv("BHASHINI_PIPELINE_ID", _BHASHINI_DEFAULT_TTS_PIPELINE_ID),
+    )
     # Bhashini pipeline routes Sanskrit (Devanagari script) under the
     # Indo-Aryan/Devanagari model ('hi').
     bhashini_lang = "hi" if language == "sa" else language

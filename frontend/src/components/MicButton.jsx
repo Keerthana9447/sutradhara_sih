@@ -110,7 +110,7 @@ async function normalizeRecording(blob, fallbackFormat, fallbackRate) {
  * to attempt (both paths need the same microphone permission), so that
  * error surfaces directly instead.
  */
-export default function MicButton({ sourceLanguage, onTranscribed, copy }) {
+export default function MicButton({ sourceLanguage, onTranscribed, copy, consentGiven = false }) {
   const [state, setState] = useState('idle') // idle | recording | transcribing | error
   const [errorMsg, setErrorMsg] = useState('')
   const recognitionRef = useRef(null)
@@ -233,6 +233,7 @@ export default function MicButton({ sourceLanguage, onTranscribed, copy }) {
             source_language: sourceLanguage,
             audio_format: normalized.format,
             sampling_rate: normalized.samplingRate,
+            external_processing_consent: true,
           })
           if (res.transcribed_ok && res.text) {
             onTranscribed(res.text)
@@ -292,7 +293,7 @@ export default function MicButton({ sourceLanguage, onTranscribed, copy }) {
       <button
         type="button"
         onClick={state === 'recording' ? stopRecording : startRecording}
-        disabled={!supported || state === 'transcribing'}
+        disabled={!supported || state === 'transcribing' || !consentGiven}
         title={state === 'recording' ? copy.micStop : supported ? copy.micStart : copy.micUnavailableTooltip}
         className={`inline-flex items-center justify-center w-9 h-9 rounded-md border transition-colors shrink-0 ${
           state === 'recording'

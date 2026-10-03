@@ -1,29 +1,15 @@
 fastapi==0.115.0
 uvicorn[standard]==0.30.6
 pydantic==2.9.2
-scikit-learn==1.5.2
-numpy==1.26.4
 python-multipart==0.0.9
 deep-translator==1.11.4
-pytest==8.3.3
 httpx==0.27.2
 python-dotenv==1.0.1
 reportlab==5.0.1
 sarvamai==0.1.34
-
-# --- Dense retrieval (BGE embeddings) — OPTIONAL, NOT installed by default ---
-# app/retrieval.py's primary, always-installed retrieval path is TF-IDF
-# (scikit-learn, already listed above) — deliberately, so the default
-# install here stays light enough for Render's free/starter tiers: no
-# onnxruntime, no faiss, no multi-hundred-MB model download during build.
-# fastembed gives BAAI/bge-small-en-v1.5 dense retrieval instead, using
-# NumPy for exact cosine similarity (no FAISS dependency). It is still
-# fully supported by the code, but must be installed separately:
-# `pip install -r requirements-embeddings.txt` in an
-# environment with more build time/memory/bandwidth to spare. Without it,
-# app/retrieval.py falls back to TF-IDF automatically — no code change, no
-# flag to flip. See requirements-embeddings.txt and app/retrieval.py's
-# module docstring for the full explanation.
+# Compact CPU ONNX BGE encoder; retrieval retains its stdlib TF-IDF fallback.
+# Intentionally no faiss-cpu, torch, or sentence-transformers.
+fastembed==0.8.0
 
 # --- Deterministic pipeline orchestration (app/dag.py) ---
 # Wires the /api/analyze pipeline (classify -> route -> retrieve -> score ->
@@ -34,7 +20,7 @@ sarvamai==0.1.34
 # to import, app/dag.py falls back to `_run_sequential`, a hand-written
 # executor that calls the exact same node functions in the exact same
 # order/branches with zero LangGraph dependency -- same not-installed-by-
-# default-still-works pattern as the embeddings split above.
+# default-still-works pattern as the retrieval above.
 langgraph==0.2.34
 
 # --- Live corpus-freshness checks + registry lookups (optional at runtime) ---
@@ -56,24 +42,5 @@ pypdf==5.9.0
 # Only used if NEO4J_URI/NEO4J_USER/NEO4J_PASSWORD are set and a Neo4j
 # instance is reachable; otherwise app/graph_reasoning.py's in-memory
 # traversal runs unchanged (same graceful-fallback pattern as the
-# embeddings split and langgraph above).
+# retrieval and langgraph above).
 neo4j==5.24.0
-
-# Optional dense-retrieval stack for app/retrieval.py.
-#
-# NOT installed by default (see requirements.txt) — the default, always-
-# installed retrieval path is TF-IDF (scikit-learn), which is what actually
-# runs on a lightweight deployment (e.g. Render's free/starter tiers) and
-# in any environment without internet access to download the ~130MB ONNX
-# model from the Hugging Face Hub on first use.
-#
-# Install this file ON TOP of requirements.txt only if you have an
-# environment with more build time, memory, and bandwidth to spare, and
-# want BAAI/bge-small-en-v1.5 dense embedding retrieval instead:
-#
-#   pip install -r requirements.txt -r requirements-embeddings.txt
-#
-# No code change or flag is needed either way — app/retrieval.py detects
-# whether fastembed imports successfully and the model can be loaded,
-# and falls back to TF-IDF automatically if not.
-fastembed==0.3.6

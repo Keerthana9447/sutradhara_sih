@@ -69,7 +69,7 @@ function ClaimCard({ claim, index, t }) {
   )
 }
 
-export default function ClaimsWorkflow({ copy, language = 'en' }) {
+export default function ClaimsWorkflow({ copy, language = 'en', externalProcessingConsent = false }) {
   const [claims, setClaims] = useState([])
   const [loading, setLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -112,7 +112,7 @@ export default function ClaimsWorkflow({ copy, language = 'en' }) {
     ])),
   }
   const { text: t, available: translationAvailable, pending: translationPending } =
-    useTranslatedStrings(language, translationSource)
+    useTranslatedStrings(language, translationSource, externalProcessingConsent)
 
   const loadClaims = async () => {
     setLoading(true)

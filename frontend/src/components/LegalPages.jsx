@@ -46,7 +46,7 @@ function Accordion({ heading, children }) {
   )
 }
 
-export default function LegalPages({ language = 'en' }) {
+export default function LegalPages({ language = 'en', externalProcessingConsent = false }) {
   const [tab, setTab] = useState('rti')
   const [data, setData] = useState({})
   const [error, setError] = useState('')
@@ -86,7 +86,7 @@ export default function LegalPages({ language = 'en' }) {
       }
     }
   })
-  const { text: t, available, pending } = useTranslatedStrings(language, translationSource)
+  const { text: t, available, pending } = useTranslatedStrings(language, translationSource, externalProcessingConsent)
 
   const rti = data.rti
   const terms = data.terms

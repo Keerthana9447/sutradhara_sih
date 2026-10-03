@@ -43,6 +43,8 @@ class _FakeClient:
         return False
 
     def post(self, url, headers=None, json=None):
+        self.requests = getattr(self, "requests", [])
+        self.requests.append((url, json))
         if url == asr._BHASHINI_PIPELINE_CONFIG_URL:
             return _FakeResponse({
                 "pipelineResponseConfig": [{"config": [{"serviceId": "fake-asr-service"}]}],
@@ -93,6 +95,20 @@ def test_transcribe_via_bhashini_success_with_mocked_http(monkeypatch):
 
     result = asr._transcribe_via_bhashini(_fake_audio_b64(), "te", "wav", 16000)
     assert result == "Can I patent this formulation?"
+
+
+@pytest.mark.parametrize("language", ["en", "hi", "te", "ta", "ml", "sa"])
+def test_bhashini_asr_routes_each_supported_language(monkeypatch, language):
+    monkeypatch.setenv("BHASHINI_ASR_USER_ID", "test-user")
+    monkeypatch.setenv("BHASHINI_ASR_API_KEY", "test-key")
+    monkeypatch.setattr(asr, "_HTTPX_AVAILABLE", True)
+    fake_client = _FakeClient()
+    monkeypatch.setattr(asr.httpx, "Client", lambda **kwargs: fake_client)
+
+    assert asr._transcribe_via_bhashini(_fake_audio_b64(), language, "wav", 16000)
+    inference_payload = fake_client.requests[-1][1]
+    sent_language = inference_payload["pipelineTasks"][0]["config"]["language"]["sourceLanguage"]
+    assert sent_language == language
 
 
 def test_transcribe_via_bhashini_returns_none_without_credentials(monkeypatch):
@@ -163,6 +179,8 @@ class _FakeTTSClient(_FakeClient):
     (output.source)."""
 
     def post(self, url, headers=None, json=None):
+        self.requests = getattr(self, "requests", [])
+        self.requests.append((url, json))
         if url == asr._BHASHINI_PIPELINE_CONFIG_URL:
             return _FakeResponse({
                 "pipelineResponseConfig": [{"config": [{"serviceId": "fake-tts-service"}]}],
@@ -221,6 +239,23 @@ def test_synthesize_via_bhashini_success_with_mocked_http(monkeypatch):
 
     result = asr._synthesize_via_bhashini("Hello, can I patent this?", "te")
     assert result == "ZmFrZS13YXYtYXVkaW8="
+
+
+@pytest.mark.parametrize(
+    ("language", "provider_language"),
+    [("en", "en"), ("hi", "hi"), ("te", "te"), ("ta", "ta"), ("ml", "ml"), ("sa", "hi")],
+)
+def test_bhashini_tts_routes_each_supported_language(monkeypatch, language, provider_language):
+    monkeypatch.setenv("BHASHINI_TTS_USER_ID", "test-user")
+    monkeypatch.setenv("BHASHINI_TTS_API_KEY", "test-key")
+    monkeypatch.setattr(asr, "_HTTPX_AVAILABLE", True)
+    fake_client = _FakeTTSClient()
+    monkeypatch.setattr(asr.httpx, "Client", lambda **kwargs: fake_client)
+
+    assert asr._synthesize_via_bhashini("नमस्ते", language)
+    inference_payload = fake_client.requests[-1][1]
+    sent_language = inference_payload["pipelineTasks"][0]["config"]["language"]["sourceLanguage"]
+    assert sent_language == provider_language
 
 
 def test_synthesize_via_bhashini_returns_none_without_credentials(monkeypatch):

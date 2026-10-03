@@ -17,8 +17,9 @@ import {
   Trash2,
   Shield,
   Database,
-  BookImage,
   Scale,
+  FolderOpen,
+  ShieldAlert,
 } from 'lucide-react'
 import { api } from './api'
 import { COPY } from './copy'
@@ -44,21 +45,21 @@ import { ABSTool, TKDLTool } from './components/QuickTools'
 import AmbientField from './components/Ambient'
 import { BotanicalCorner, ManuscriptRule } from './components/Botanical'
 import { navIcon, areaIcon } from './components/DomainIcons'
-import ManuscriptOCR from './components/ManuscriptOCR'
+import ClaimsWorkflow from './components/ClaimsWorkflow'
 import PatentsRegistry from './components/PatentsRegistry'
 import AdminDashboard from './components/AdminDashboard'
 import LegalPages from './components/LegalPages'
+import FormulationDossiers from './components/FormulationDossiers'
+import PrahariWatchlist from './components/PrahariWatchlist'
 
 // 'workspace' and 'compliance' are parent tabs — each capability lives in
 // the matching secondary tab bar rather than the primary navigation.
 const CITIZEN_NAV = ['analyze', 'workspace', 'compliance', 'graph', 'eval', 'legal']
 const ADMIN_NAV   = ['analyze', 'admin', 'workspace', 'compliance', 'graph', 'eval', 'legal']
 
-// Sub-tabs for each parent, in display order. Components rendered for each
-// value are unchanged from before this consolidation — see the render
-// block below.
-const WORKSPACE_SUBTABS = ['ocr', 'registry']
-const COMPLIANCE_SUBTABS = ['abs', 'tkdl']
+// Sub-tabs for each parent, in display order.
+const WORKSPACE_SUBTABS = ['claims', 'dossiers', 'registry']
+const COMPLIANCE_SUBTABS = ['abs', 'tkdl', 'prahari']
 
 // Reverse lookup for the remaining workspace and compliance tabs.
 const SUBTAB_PARENT = {}
@@ -71,7 +72,7 @@ const NAV_KEY = {
   tkdl: 'navTkdl',
   graph: 'navGraph',
   eval: 'navEval',
-  ocr: 'navOcr',
+  claims: 'navClaims',
   registry: 'navRegistry',
   legal: 'navLegal',
   admin: 'navAdmin',
@@ -80,18 +81,21 @@ const NAV_KEY = {
 }
 
 const NAV_LABELS = {
-  ocr: 'Manuscript',
+  claims: 'My Claims',
+  dossiers: 'Formulation Dossiers',
+  prahari: 'Prahari Patent Watch',
   registry: 'Registry',
   legal: 'Legal',
   admin: 'Admin',
   // workspace/compliance intentionally have no English fallback here —
   // their labels come from copy.js in every supported language (see
-  // NAV_KEY above), same as the other PS-named top-level tabs (abs, tkdl,
-  // graph, connectors, eval, analyze).
+  // NAV_KEY above).
 }
 
 const NAV_ICONS = {
-  ocr: BookImage,
+  claims: FileCheck2,
+  dossiers: FolderOpen,
+  prahari: ShieldAlert,
   registry: Database,
   legal: Scale,
   admin: Shield,
@@ -218,6 +222,10 @@ export default function App() {
   const [queryDepth, setQueryDepth] = useState('guided')
   const [jurisdiction, setJurisdiction] = useState('India')
   const [query, setQuery] = useState('')
+  const [profileAudience, setProfileAudience] = useState('cultivator')
+  const [profileIngredients, setProfileIngredients] = useState('')
+  const [profileRegion, setProfileRegion] = useState('')
+  const [externalProcessingConsent, setExternalProcessingConsent] = useState(false)
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState(null)
   const [pendingClarification, setPendingClarification] = useState(null)
@@ -236,7 +244,7 @@ export default function App() {
   const [authPage, setAuthPage] = useState('signin') // 'signin' | 'signup' | 'admin'
 
   const copy = COPY[lang]
-  const { text: navLabel } = useTranslatedStrings(lang, NAV_LABELS)
+  const { text: navLabel } = useTranslatedStrings(lang, NAV_LABELS, externalProcessingConsent)
   const analysisTranslationSource = {
     queryDepthLabel: 'Query depth',
     quickDepth: 'Quick · 3 sources',
@@ -256,7 +264,7 @@ export default function App() {
     ])),
   }
   const { text: analysisText, available: analysisTranslationAvailable, pending: analysisTranslationPending } =
-    useTranslatedStrings(lang, analysisTranslationSource)
+    useTranslatedStrings(lang, analysisTranslationSource, externalProcessingConsent)
 
   // ── Fetch user role after sign-in ───────────────────────────────────────
   useEffect(() => {
@@ -273,15 +281,26 @@ export default function App() {
   const NAV = userRole === 'admin' ? ADMIN_NAV : CITIZEN_NAV
 
   // ── Deep-linkability for consolidated tabs ──────────────────────────────
-  // Hash shape is #<parentTab> or #<parentTab>/<subTab>, e.g. #workspace/ocr,
-  // #compliance/tkdl, #graph. Existing supported sub-tabs are resolved
-  // through SUBTAB_PARENT; removed feature hashes are ignored.
+  // Hash shape is #<parentTab> or #<parentTab>/<subTab>, e.g.
+  // #workspace/registry, #compliance/tkdl, #graph. Removed feature hashes
+  // redirect to an available screen.
   useEffect(() => {
     const applyHash = (hash) => {
       const [rawTab, rawSub] = hash.replace(/^#/, '').split('/')
       if (!rawTab) return
+      if (rawTab === 'connectors') {
+        setTab('analyze')
+        window.history.replaceState(null, '', '#analyze')
+        return
+      }
+      if (rawTab === 'ocr') {
+        setTab('workspace')
+        setWorkspaceSubTab('claims')
+        window.history.replaceState(null, '', '#workspace/claims')
+        return
+      }
       if (SUBTAB_PARENT[rawTab]) {
-        // Legacy flat hash, e.g. #ocr -> workspace/ocr
+        // Legacy flat hashes are resolved through the current sub-tab map.
         const parent = SUBTAB_PARENT[rawTab]
         setTab(parent)
         if (parent === 'workspace') setWorkspaceSubTab(rawTab)
@@ -293,6 +312,9 @@ export default function App() {
         if (rawSub && SUBTAB_PARENT[rawSub] === rawTab) {
           if (rawTab === 'workspace') setWorkspaceSubTab(rawSub)
           else setComplianceSubTab(rawSub)
+        } else if (rawTab === 'workspace' && rawSub === 'ocr') {
+          setWorkspaceSubTab('claims')
+          window.history.replaceState(null, '', '#workspace/claims')
         }
         return
       }
@@ -377,7 +399,8 @@ export default function App() {
 
     try {
       const payload = {
-        query,
+        query: [query, `Audience: ${profileAudience}.`, profileIngredients.trim() ? `Ingredients or biological resources: ${profileIngredients.trim()}.` : '', profileRegion.trim() ? `Source region or provenance: ${profileRegion.trim()}.` : ''].filter(Boolean).join('\n'),
+        external_processing_consent: externalProcessingConsent,
         jurisdiction,
         language: langOverride || lang,
         query_depth: depthOverride || queryDepth,
@@ -639,14 +662,26 @@ export default function App() {
                   labelOverrides={Object.fromEntries(Object.keys(NAV_LABELS).map((key) => [key, navLabel(key)]))}
                 />
                 {complianceSubTab === 'abs' && (
-                  <ABSTool copy={copy} language={lang} />
+                  <ABSTool
+                    copy={copy}
+                    language={lang}
+                    externalProcessingConsent={externalProcessingConsent}
+                    setExternalProcessingConsent={setExternalProcessingConsent}
+                  />
                 )}
                 {complianceSubTab === 'tkdl' && (
-                  <TKDLTool copy={copy} language={lang} />
+                  <TKDLTool
+                    copy={copy}
+                    language={lang}
+                    externalProcessingConsent={externalProcessingConsent}
+                    setExternalProcessingConsent={setExternalProcessingConsent}
+                  />
+                )}
+                {complianceSubTab === 'prahari' && (
+                  <PrahariWatchlist language={lang} externalProcessingConsent={externalProcessingConsent} />
                 )}
               </>
             )}
-
 
             {/* ── New feature tabs, grouped under Patent Workspace ── */}
             {tab === 'workspace' && (
@@ -658,17 +693,20 @@ export default function App() {
                   copy={copy}
                   labelOverrides={Object.fromEntries(Object.keys(NAV_LABELS).map((key) => [key, navLabel(key)]))}
                 />
-                {workspaceSubTab === 'ocr' && (
-                  <ManuscriptOCR copy={copy} language={lang} />
+                {workspaceSubTab === 'claims' && (
+                  <ClaimsWorkflow copy={copy} language={lang} externalProcessingConsent={externalProcessingConsent} />
+                )}
+                {workspaceSubTab === 'dossiers' && (
+                  <FormulationDossiers language={lang} externalProcessingConsent={externalProcessingConsent} />
                 )}
                 {workspaceSubTab === 'registry' && (
-                  <PatentsRegistry copy={copy} language={lang} />
+                  <PatentsRegistry copy={copy} language={lang} externalProcessingConsent={externalProcessingConsent} />
                 )}
               </>
             )}
 
             {tab === 'legal' && (
-              <LegalPages copy={copy} language={lang} />
+              <LegalPages copy={copy} language={lang} externalProcessingConsent={externalProcessingConsent} />
             )}
 
             {tab === 'admin' && userRole === 'admin' && (
@@ -732,6 +770,24 @@ export default function App() {
                     className="research-input w-full min-h-28 border border-hairline rounded-md px-4 py-3 text-sm leading-relaxed focus:outline-none"
                   />
 
+                  <div className="grid gap-3 sm:grid-cols-3 mt-3">
+                    <label className="text-xs text-ink/60">{copy.profileAudience}
+                      <select value={profileAudience} onChange={(e) => setProfileAudience(e.target.value)} className="mt-1 block w-full border border-hairline rounded px-2 py-2 bg-paper text-ink">
+                        {Object.entries(copy.audienceOptions).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                      </select>
+                    </label>
+                    <label className="text-xs text-ink/60">{copy.profileIngredients}
+                      <input value={profileIngredients} onChange={(e) => setProfileIngredients(e.target.value)} placeholder={copy.profileIngredientsPlaceholder} className="mt-1 block w-full border border-hairline rounded px-3 py-2 bg-paper text-ink" />
+                    </label>
+                    <label className="text-xs text-ink/60">{copy.profileRegion}
+                      <input value={profileRegion} onChange={(e) => setProfileRegion(e.target.value)} placeholder={copy.profileRegionPlaceholder} className="mt-1 block w-full border border-hairline rounded px-3 py-2 bg-paper text-ink" />
+                    </label>
+                  </div>
+                  <label className="mt-3 flex items-start gap-2 text-xs leading-relaxed text-ink/60">
+                    <input type="checkbox" checked={externalProcessingConsent} onChange={(e) => setExternalProcessingConsent(e.target.checked)} className="mt-0.5" />
+                    <span>{copy.externalProcessingConsent}</span>
+                  </label>
+
                   <div className="flex items-center justify-between mt-3 flex-wrap gap-2">
                     <span className="inline-flex items-center gap-2.5 text-xs text-ink/45">
                       <JurisdictionMark
@@ -742,6 +798,7 @@ export default function App() {
                       {jurisdiction}
 
                       <MicButton
+                        consentGiven={externalProcessingConsent}
                         sourceLanguage={lang}
                         copy={copy}
                         onTranscribed={(text) =>
@@ -754,6 +811,7 @@ export default function App() {
                       />
 
                       <ReadAloudButton
+                        consentGiven={externalProcessingConsent}
                         text={
                           !loading &&
                           result &&

@@ -213,6 +213,7 @@ def test_translate_batch_translates_each_text_to_all_supported_languages(monkeyp
         response = translate_batch(TranslateBatchRequest(
             texts=["Button label", "Generated legal guidance"],
             target_language=target,
+            external_processing_consent=True,
         ))
         assert response["target_language"] == target
         assert [item["translated"] for item in response["results"]] == [
@@ -228,6 +229,7 @@ def test_translate_batch_reports_long_text_failure_without_skipping_other_items(
     response = translate_batch(TranslateBatchRequest(
         texts=["Short label", "x" * 6001],
         target_language="te",
+        external_processing_consent=True,
     ))
     assert response["results"][0]["success"] is True
     assert response["results"][1]["success"] is False

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { ShieldCheck, ScrollText, Loader2, Search, Check, Minus, AlertCircle } from 'lucide-react'
 import { api } from '../api'
 import JurisdictionSwitch from './JurisdictionSwitch'
@@ -48,6 +48,8 @@ function QueryBox({
   extra,
   copy,
   language,
+  externalProcessingConsent,
+  setExternalProcessingConsent,
   readAloudText,
   readAloudLang,
 }) {
@@ -61,9 +63,19 @@ function QueryBox({
         rows={3}
         className="research-input w-full min-h-24 border border-hairline rounded-md px-4 py-3 text-sm leading-relaxed focus:outline-none"
       />
+      <label className="mt-3 flex items-start gap-2 text-xs leading-relaxed text-ink/60">
+        <input
+          type="checkbox"
+          checked={externalProcessingConsent}
+          onChange={(e) => setExternalProcessingConsent(e.target.checked)}
+          className="mt-0.5"
+        />
+        <span>{copy.externalProcessingConsent}</span>
+      </label>
       <div className="flex items-center justify-between mt-3 flex-wrap gap-2">
         <span className="inline-flex items-center gap-2.5">
           <MicButton
+            consentGiven={externalProcessingConsent}
             sourceLanguage={language}
             copy={copy}
             onTranscribed={(text) =>
@@ -72,6 +84,7 @@ function QueryBox({
           />
 
           <ReadAloudButton
+            consentGiven={externalProcessingConsent}
             text={readAloudText || ''}
             lang={readAloudLang || language}
             copy={copy}
@@ -91,7 +104,7 @@ function QueryBox({
   )
 }
 
-export function ABSTool({ copy, language }) {
+export function ABSTool({ copy, language, externalProcessingConsent, setExternalProcessingConsent }) {
   const [query, setQuery] = useState('')
   const [jurisdiction, setJurisdiction] = useState('India')
   const [loading, setLoading] = useState(false)
@@ -102,7 +115,12 @@ export function ABSTool({ copy, language }) {
     setLoading(true)
     setError(null)
     try {
-      const res = await api.analyze({ query, jurisdiction, language })
+      const res = await api.analyze({
+        query,
+        jurisdiction,
+        language,
+        external_processing_consent: externalProcessingConsent,
+      })
       setResult(res)
     } catch (e) {
       setError(copy.systemError)
@@ -126,6 +144,8 @@ export function ABSTool({ copy, language }) {
         extra={<JurisdictionSwitch value={jurisdiction} onChange={setJurisdiction} copy={copy} />}
         copy={copy}
         language={language}
+        externalProcessingConsent={externalProcessingConsent}
+        setExternalProcessingConsent={setExternalProcessingConsent}
         readAloudText={!loading && result && !result.abstained ? result.answer : ''}
         readAloudLang={result?.answer_language || language}
       />
@@ -171,7 +191,7 @@ export function ABSTool({ copy, language }) {
   )
 }
 
-export function TKDLTool({ copy, language }) {
+export function TKDLTool({ copy, language, externalProcessingConsent, setExternalProcessingConsent }) {
   const [query, setQuery] = useState('')
   const [jurisdiction, setJurisdiction] = useState('India')
   const [loading, setLoading] = useState(false)
@@ -182,7 +202,12 @@ export function TKDLTool({ copy, language }) {
     setLoading(true)
     setError(null)
     try {
-      const res = await api.analyze({ query, jurisdiction, language })
+      const res = await api.analyze({
+        query,
+        jurisdiction,
+        language,
+        external_processing_consent: externalProcessingConsent,
+      })
       setResult(res)
     } catch (e) {
       setError(copy.systemError)
@@ -204,6 +229,8 @@ export function TKDLTool({ copy, language }) {
         extra={<JurisdictionSwitch value={jurisdiction} onChange={setJurisdiction} copy={copy} />}
         copy={copy}
         language={language}
+        externalProcessingConsent={externalProcessingConsent}
+        setExternalProcessingConsent={setExternalProcessingConsent}
         readAloudText={!loading && result && !result.abstained ? result.answer : ''}
         readAloudLang={result?.answer_language || language}
       />
@@ -257,5 +284,3 @@ function EmptyTool({ icon: Icon, label, preview, text }) {
     </div>
   )
 }
-
-

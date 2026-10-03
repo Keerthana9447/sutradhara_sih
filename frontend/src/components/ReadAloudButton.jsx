@@ -90,7 +90,7 @@ function resolveVoice(voices, langCode) {
  * goes straight to speakInBrowser(). Non-English backend failures are
  * shown explicitly instead of silently playing through an unrelated voice.
  */
-export default function ReadAloudButton({ text, lang, copy }) {
+export default function ReadAloudButton({ text, lang, copy, consentGiven = false }) {
   const [state, setState] = useState('idle') // idle | loading | speaking
   const [error, setError] = useState('')
   const audioRef = useRef(null)
@@ -242,7 +242,7 @@ export default function ReadAloudButton({ text, lang, copy }) {
       try {
         for (const chunk of splitForSynthesis(text, BACKEND_TTS_CHUNK_CHARS)) {
           if (playback.cancelled) return
-          const res = await api.synthesizeSpeech({ text: chunk, language: lang })
+          const res = await api.synthesizeSpeech({ text: chunk, language: lang, external_processing_consent: true })
           await playAudioChunk(res.audio_base64, () => playback.cancelled)
         }
         if (!playback.cancelled) setState('idle')
@@ -261,13 +261,13 @@ export default function ReadAloudButton({ text, lang, copy }) {
   }
 
   const speaking = state === 'speaking' || state === 'loading'
-  const disabled = !text
+  const disabled = !text || !consentGiven
   return (
     <button
       type="button"
       onClick={speaking ? stop : start}
       disabled={disabled}
-      title={disabled ? copy.readAloudNoAnswer : speaking ? copy.readAloudStop : error || copy.readAloudStart}
+      title={disabled ? (!consentGiven ? copy.externalProcessingConsent : copy.readAloudNoAnswer) : speaking ? copy.readAloudStop : error || copy.readAloudStart}
       aria-pressed={speaking}
       className={`inline-flex items-center justify-center w-9 h-9 rounded-md border transition-colors shrink-0 ${
         speaking

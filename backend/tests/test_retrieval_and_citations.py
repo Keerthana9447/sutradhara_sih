@@ -39,12 +39,22 @@ def _run(query: str, jurisdiction_name: str):
 
 
 def test_retrieval_backend_is_reported_and_valid():
-    """Informational: confirms the module always reports a real backend name.
-    Not a hard requirement on WHICH backend — this sandbox cannot reach the
-    embedding-model downloads, so it
-    always falls back to 'tfidf' here; a machine with internet access
-    should see 'embeddings' instead (see retrieval.py docstring)."""
-    assert retrieval.BACKEND == "tfidf-stdlib"
+    """The optional model can fall back cleanly when its download is unavailable."""
+    assert retrieval.BACKEND in {"tfidf-stdlib", "bge-fastembed+tfidf"}
+
+
+def test_hybrid_retrieval_keeps_jurisdiction_isolation(monkeypatch):
+    class FakeEmbedder:
+        def embed(self, texts):
+            return [[1.0, 0.0] for _ in texts]
+
+    monkeypatch.setattr(retrieval, "_ensure_embeddings", lambda: True)
+    monkeypatch.setattr(retrieval, "_EMBEDDER", FakeEmbedder())
+    monkeypatch.setattr(retrieval, "_DOC_EMBEDDINGS", [[1.0, 0.0] for _ in retrieval._CORPUS])
+    results = retrieval.retrieve("patent traditional knowledge", "India", ["Patents"], top_k=5)
+    assert results
+    assert all(source["jurisdiction"] == "India" for source in results)
+    assert all(0 <= source["relevance_score"] <= 1 for source in results)
 
 
 # --- Demo scenario 1: classical formulation, India --------------------------

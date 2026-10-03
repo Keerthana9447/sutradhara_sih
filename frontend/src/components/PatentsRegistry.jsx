@@ -64,7 +64,7 @@ function RegistryCard({ entry, index, t }) {
   )
 }
 
-export default function PatentsRegistry({ copy, language = 'en' }) {
+export default function PatentsRegistry({ copy, language = 'en', externalProcessingConsent = false }) {
   const [entries, setEntries] = useState([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(false)
@@ -101,7 +101,7 @@ export default function PatentsRegistry({ copy, language = 'en' }) {
     ])),
   }
   const { text: t, available: translationAvailable, pending: translationPending } =
-    useTranslatedStrings(language, translationSource)
+    useTranslatedStrings(language, translationSource, externalProcessingConsent)
 
   const load = async (kw = keyword, sys = system, off = offset) => {
     setLoading(true)

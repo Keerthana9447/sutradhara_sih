@@ -14,7 +14,7 @@ FastAPI Backend
    ├─▶ Query Understanding + Product Classifier  (app/classifier.py)
    ├─▶ Jurisdiction Router                         (app/jurisdiction.py — hard filter)
    ├─▶ IP/Regulatory Area Router                    (app/jurisdiction.py)
-   ├─▶ Jurisdiction-filtered standard-library TF-IDF retrieval (app/retrieval.py)
+   ├─▶ Jurisdiction-filtered BGE + stdlib TF-IDF retrieval (app/retrieval.py)
    ├─▶ Evidence scoring / Confidence + Abstention   (app/confidence.py)
    ├─▶ Grounded Answer Assembly (+ ABS + TK pointer) (app/answer.py)
    └─▶ Audit / Feedback / Escalation store (SQLite)  (app/db.py)
@@ -60,7 +60,7 @@ the brief exactly.
 
 1. **Hard filter** candidates by jurisdiction (India / International) —
    never combined.
-2. **Soft rank**: standard-library TF-IDF cosine similarity over the hard-filtered jurisdiction candidates, with a conditional domain boost.
+2. **Soft rank**: BGE-small ONNX semantic similarity blended with stdlib TF-IDF lexical similarity over the hard-filtered jurisdiction candidates, with conditional domain and binding-source boosts. If FastEmbed/model loading fails, stdlib TF-IDF continues without embeddings.
 3. Documents below a relevance floor are dropped entirely.
 4. Confidence is computed from the *retained* set (§I below).
 5. If confidence is below threshold or the set is empty → abstain.

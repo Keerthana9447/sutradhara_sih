@@ -9,7 +9,7 @@
 [![Backend](https://img.shields.io/badge/backend-FastAPI-009688)](backend)
 [![Frontend](https://img.shields.io/badge/frontend-React%20%2B%20Vite%20%2B%20Tailwind-38bdf8)](frontend)
 [![Orchestration](https://img.shields.io/badge/orchestration-LangGraph%20DAG-6f42c1)](backend/app/dag.py)
-[![Retrieval](https://img.shields.io/badge/retrieval-stdlib%20TF--IDF-orange)](backend/app/retrieval.py)
+[![Retrieval](https://img.shields.io/badge/retrieval-BGE%20%2B%20TF--IDF-blue)](backend/app/retrieval.py)
 [![Languages](https://img.shields.io/badge/languages-6%20%28en·hi·te·ta·ml·sa%29-brightgreen)](backend/app/language.py)
 [![Status](https://img.shields.io/badge/status-working%20prototype-yellow)](#9-known-limitations)
 
@@ -20,6 +20,18 @@
 </div>
 
 ---
+
+## Team details
+
+| Detail | Information |
+|---|---|
+| Team name | Chaturya |
+| Team ID | 168163 |
+| Team leader | Gummadi Keerthana |
+| College | G. Pulla Reddy Engineering College (Autonomous), Kurnool |
+
+**Team members:** Gontumukkala Sharada, Gudithoti Ambhika, Shaik Mohammed
+Tabraiz, Nadagavani Gnana Sushanth, and Jammana Krishna Sai.
 
 > **This is a working prototype, not a production system.** It prioritizes
 > correctness, traceability, and jurisdictional clarity over feature count —
@@ -73,6 +85,24 @@ the evidence isn't there.
 | 5 | **IP Posture Summary PDF export** | `app/posture_pdf.py` → `POST /api/posture-pdf` | Turns one analysis into a downloadable, timestamped PDF, rendered from exactly what the UI already showed — nothing invented, nothing extra. |
 | 6 | **Consent-logged source connectors** | `app/connectors.py` → `/api/connectors/*` | The USPTO PatentsView adapter performs live US-patent searches using the linked API key, encrypted at rest. Results stay separate from legal citations; other provider names remain clearly simulated until provider-specific adapters are implemented. |
 
+Two persistent, account-scoped tools are also available from the signed-in UI:
+
+- **Formulation Dossiers** (`Patent Workspace → Formulation Dossiers`,
+  `/api/v1/dossiers`) store a named product's ingredients, sourcing,
+  indication, and target market. Dossiers progress through
+  `draft → classified → mapped → under_review`, with each action and its
+  result retained in SQLite history. Evidence for India and International
+  markets is stored separately.
+- **Prahari Patent Watch** (`Compliance Tools → Prahari Patent Watch`,
+  `/api/v1/prahari`) keeps user-entered domestic and foreign filing records,
+  recalculates a six-calendar-month monitoring target and urgency band on
+  every read, and scores resemblance against the same small public reference
+  set as the TKDL-style helper. The prototype does not poll patent registries
+  automatically. Its six-month date is an internal watch target, not a
+  statutory deadline: Indian Patent Rules, Rule 55(1A), provides for
+  representations after publication and before grant, without setting a
+  fixed six-month period. See the [official Rules](https://ipindia.gov.in/writereaddata/Portal/IPOAct/1_113_1_patent-rules-2003.pdf).
+
 Supporting the six features above, the core pipeline itself carries three
 capabilities worth calling out on their own:
 
@@ -115,7 +145,7 @@ flowchart TD
         CLS["Query Understanding +\nProduct Classifier\n(classifier.py)"]
         JUR["Jurisdiction Router\n— hard filter (jurisdiction.py)"]
         AREA["IP / Regulatory Area Router\n(jurisdiction.py)"]
-        RET["Hybrid Retrieval\nstdlib TF-IDF retrieval\n→ TF-IDF fallback (retrieval.py)"]
+        RET["Hybrid Retrieval\nBGE semantic + stdlib TF-IDF\n→ TF-IDF fallback (retrieval.py)"]
         CONF["Confidence + Abstention\n(confidence.py)"]
         ANS["Grounded Answer Assembly\n+ ABS + TK pointer (answer.py)"]
         DB[("SQLite\naudit / feedback / escalation\n(db.py)")]
@@ -178,7 +208,7 @@ flowchart LR
 
 If the `langgraph` package isn't installed, the exact same node functions run
 through a hand-written sequential executor instead — same fallback pattern as
-the stdlib TF-IDF retrieval below. `GET /api/health` reports which backend
+the BGE + TF-IDF retrieval below. `GET /api/health` reports which backend
 (`langgraph` or `sequential`) actually executed via `dag_backend`.
 
 ### 3.3 Request sequence — one `/api/analyze` call
@@ -189,7 +219,7 @@ sequenceDiagram
     participant API as FastAPI /api/analyze
     participant LANG as language.py + translate.py
     participant DAG as LangGraph DAG (dag.py)
-    participant RET as retrieval.py (stdlib TF-IDF)
+    participant RET as retrieval.py (BGE + TF-IDF)
     participant CONF as confidence.py
     participant LLM as Groq (optional paraphrase)
     participant DB as SQLite audit log
@@ -299,12 +329,12 @@ availability, credentials, and language support in the deployment.
 
 ### 3.6 Retrieval, close up
 
-The backend uses standard-library TF-IDF with cosine similarity. Candidate documents are hard-filtered by jurisdiction before ranking, and the domain boost applies only after a lexical match.
+The backend combines FastEmbed's BGE-small ONNX embeddings with standard-library TF-IDF cosine scores. Candidate documents are hard-filtered by jurisdiction before ranking; lexical matches help preserve exact law and instrument names. If FastEmbed or its model cannot load, the same jurisdiction-isolated TF-IDF path remains available. Set `SUTRADHARA_RETRIEVAL_BACKEND=tfidf` to force the lightweight fallback, or `SUTRADHARA_BGE_MODEL` to select another FastEmbed-supported model. The model loads lazily on the first retrieval request.
 
 ```mermaid
 flowchart TD
     QRY["English query"] --> HARD["Filter by jurisdiction"]
-    HARD --> SCORE["Stdlib TF-IDF ranking"]
+    HARD --> SCORE["BGE semantic + TF-IDF lexical ranking"]
     SCORE --> BOOST["Conditional domain boost"]
     BOOST --> FLOOR{"Above relevance floor?"}
     FLOOR -->|"no"| DROP["Drop document"]
@@ -375,6 +405,13 @@ cat backend/graph/schema.cypher | cypher-shell -u neo4j -p <password>
 | `POST` | `/api/connectors/revoke` | 🔑 Revoke a linked connector (fails closed immediately) |
 | `GET` | `/api/connectors` | List the user's linked connectors |
 | `GET` | `/api/connectors/{id}/usage` | Usage log for one connector |
+| `GET/POST` | `/api/v1/dossiers` | List/create the signed-in user's formulation dossiers |
+| `GET/PATCH/DELETE` | `/api/v1/dossiers/{id}` | Read/update/delete an owned dossier |
+| `POST` | `/api/v1/dossiers/{id}/classify` | Classify or confirm its product category |
+| `POST` | `/api/v1/dossiers/{id}/map` | Save jurisdiction-isolated corpus evidence |
+| `POST` | `/api/v1/dossiers/{id}/review` | Advance a mapped dossier to review |
+| `GET/POST` | `/api/v1/prahari` | List/create the signed-in user's patent watchlist filings |
+| `GET/DELETE` | `/api/v1/prahari/{id}` | Read/delete an owned watchlist filing |
 | `POST` | `/api/asr/transcribe` | 🎙️ Speech-to-text (Bhashini → Sarvam Saaras) |
 | `POST` | `/api/tts/synthesize` | 🔊 Text-to-speech (Bhashini → Sarvam Bulbul) |
 | `POST` | `/api/privacy/consent/{id}/access` | Append an authenticated consent access-log entry |
@@ -419,6 +456,16 @@ The analysis request also accepts `query_depth` (`quick`, `guided`, or `deep`).
      system returns "Insufficient authoritative evidence to provide a
      reliable answer" and offers escalation.
    Either way: never a hallucinated legal claim.
+
+   **Demo 5 — persistent dossier and Prahari watch**
+   1. Under **Patent Workspace → Formulation Dossiers**, save a formulation
+      with ingredients, sourcing, indication, and market; classify it and map
+      the cited evidence. Reopen the tab to show its saved lifecycle/history.
+   2. Under **Compliance Tools → Prahari Patent Watch**, add a published filing
+      to either the domestic or foreign stream and show the current urgency
+      band, six-month monitoring target, and public-reference resemblance
+      score. These are watchlist aids, not legal deadlines or automated registry
+      monitoring.
 
 **Demo 4 — multilingual UI, any of six languages**
 1. Toggle English → हिंदी / తెలుగు / தமிழ் / മലയാളം / संस्कृत, or type the
@@ -486,7 +533,7 @@ sutradhara/
 │   │   ├── dag.py               Deterministic LangGraph pipeline orchestration
 │   │   ├── classifier.py        Product classification (rule-based, 6 categories)
 │   │   ├── jurisdiction.py      Jurisdiction + IP-area routing
-│   │   ├── retrieval.py         standard-library TF-IDF retrieval
+│   │   ├── retrieval.py         BGE + stdlib TF-IDF retrieval
 │   │   ├── query_expansion.py   Domain-concept query-variant expansion
 │   │   ├── language.py          Script-based input-language detection (6 languages)
 │   │   ├── translate.py         Bhashini → Sarvam → Google → MyMemory translation chain
@@ -525,6 +572,10 @@ sutradhara/
 
 ---
 
+## User profile and external processing
+
+The analysis form accepts an optional audience profile (including cultivators/growers), ingredient or biological-resource list, and sourcing region to improve ABS triage. External AI, translation, and speech processing requires per-request consent. Without consent, AI planning/paraphrasing and remote translation or speech endpoints are blocked; local analysis and deterministic fallbacks remain available, and non-English output may be unavailable. Groq planning and paraphrasing also consult the configured cross-border transfer blocklist.
+
 ## 9. Known limitations (be upfront with judges about these)
 
 - The corpus is a curated prototype set (45 documents — 23 India + 22
@@ -537,7 +588,7 @@ sutradhara/
   trademarks, copyright, designs, plant variety protection, FSSAI, and the
   major WIPO-administered treaties (PCT, Madrid, Hague, Berne, Paris) plus
   UPOV.
-- Retrieval uses standard-library TF-IDF cosine similarity with jurisdiction filtering; there is no downloaded embedding model or native vector dependency.
+- Retrieval uses BGE-small through FastEmbed/ONNX plus stdlib TF-IDF lexical matching, with jurisdiction filtering applied before ranking. If the model is unavailable, it falls back to TF-IDF. No FAISS, PyTorch, or sentence-transformers is used; FastEmbed downloads the model on first retrieval unless it is already cached.
 - The answer is template-assembled directly from retrieved source summaries
   (guaranteed grounded) and then optionally passed through a Groq
   (`openai/gpt-oss-120b`) paraphrase layer purely for readability. The
@@ -639,7 +690,7 @@ sutradhara/
 |---|---|
 | Orchestration | LangGraph `StateGraph`; opt-in bounded Groq retrieval planner; deterministic fallback |
 | API | FastAPI |
-| Retrieval | Standard-library TF-IDF cosine similarity with jurisdiction filtering |
+| Retrieval | BGE-small ONNX embeddings + stdlib TF-IDF cosine matching, jurisdiction isolated; TF-IDF fallback |
 | Translation | Bhashini (MeitY/ULCA) → Sarvam AI → Google Translate → MyMemory, via `deep-translator` |
 | Voice | Bhashini ASR/TTS → Sarvam Saaras (STT) / Bulbul (TTS) |
 | Optional paraphrase LLM | Groq, `openai/gpt-oss-120b` — citation-tag-gated, never mandatory |

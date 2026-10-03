@@ -63,6 +63,8 @@ def _run_pipeline(retrieval_query: str, jurisdiction_name: str = "India"):
     """Mirrors the main.py /api/analyze pipeline for a given (English)
     retrieval query, without going through FastAPI/HTTP."""
     classification = classifier.classify(retrieval_query)
+    if classification.needs_clarification:
+        return classification, [], [], 0.0, True
     areas = jurisdiction.route_areas(retrieval_query, classification.category)
     variants = query_expansion.expand_query(retrieval_query)
     retrieved = retrieval.retrieve(variants, jurisdiction_name, areas, top_k=5)
@@ -198,7 +200,7 @@ def test_raw_scripts_without_normalization_would_fail_lexical_match():
     """
     areas = jurisdiction._CATEGORY_DEFAULT_AREAS["Classical / Generic Medicine"]
     for raw_query in (TE_QUERY, HI_QUERY, TA_QUERY, ML_QUERY, SA_QUERY):
-        assert retrieval.retrieve(raw_query, "India", areas, top_k=5) == []
+        assert retrieval._retrieve_tfidf([raw_query], "India", areas, top_k=5) == []
 
 
 def test_live_translation_path():

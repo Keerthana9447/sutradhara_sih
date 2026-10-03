@@ -8,8 +8,8 @@ from pathlib import Path
 
 try:
     from dotenv import load_dotenv
-    load_dotenv(override=True)  # loads backend/.env (GROQ_API_KEY, GROQ_MODEL, ...) if present
-    load_dotenv(Path(__file__).resolve().parents[2] / ".env", override=True)
+    load_dotenv()  # loads backend/.env (GROQ_API_KEY, GROQ_MODEL, ...) if present
+    load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 except ImportError:
     pass
 
@@ -19,12 +19,14 @@ from fastapi import FastAPI, Header, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 
 from . import jurisdiction, retrieval, db, translate, posture_pdf
-from . import graph_reasoning, eval_runner, graph, asr, dag
+from . import graph_reasoning, eval_runner, connectors, graph, asr, dag
 from . import corpus_freshness, privacy, registry_lookup, graph_store, gi_registry, auth, bias_audit
-from . import radar, ocr_digitize, admin_auth, patents_registry, features
+from . import claims_workflow, radar, ocr_digitize, admin_auth, patents_registry, features
+from . import dossiers, prahari
 from .schemas import (
     AnalyzeRequest, AnalyzeResponse, SourceRef,
     EscalateRequest, FeedbackRequest, PostureRequest,
+    ConnectorLinkRequest, ConnectorInfo, ConnectorRevokeRequest,
     GraphReasonRequest, ASRRequest, ASRResponse, TTSRequest, TTSResponse,
     RegistryLookupRequest, PrivacyLookupRequest,
     ConsentRequestRequest, ConsentIdRequest, DPIARequest, BreachReportRequest,
@@ -32,9 +34,11 @@ from .schemas import (
     CorpusRefreshRequest, CorpusRefreshApproveRequest,
     SignUpRequest, SignInRequest, AuthResponse, UserInfo,
     ChatSessionCreate, ChatSessionRename, ChatMessageAdd, SessionAnalyzeRequest,
-    RadarRequest,
+    ClaimSubmitRequest, ClaimIdRequest, RadarRequest,
     OCRRequest, AdminSignUpRequest,
     TranslateBatchRequest,
+    DossierCreateRequest, DossierUpdateRequest, DossierClassifyRequest,
+    DossierReviewRequest, PrahariAlertCreateRequest,
 )
 
 @asynccontextmanager
@@ -104,7 +108,9 @@ def analyze(req: AnalyzeRequest):
         "jurisdiction": req.jurisdiction,
         "language": req.language,
         "confirmed_category": req.confirmed_category,
+        "use_connector_id": req.use_connector_id,
         "query_depth": req.query_depth,
+        "external_processing_consent": req.external_processing_consent,
         "jur": jur,
     }
     response_fields = dag.run_analyze_pipeline(initial_state)
@@ -199,6 +205,40 @@ def eval_benchmark():
 
 
 # --------------------------------------------------------------------------
+# Paid-subscription connector (consent-logged, user-linked) — see connectors.py
+# --------------------------------------------------------------------------
+@app.post("/api/connectors/link", response_model=ConnectorInfo)
+def link_connector(req: ConnectorLinkRequest):
+    try:
+        info = connectors.link_connector(req.provider, req.api_key, req.scope, req.contact_email)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except connectors.ConnectorConfigurationError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    return ConnectorInfo(**info)
+
+
+@app.post("/api/connectors/revoke")
+def revoke_connector(req: ConnectorRevokeRequest):
+    ok = connectors.revoke_connector(req.connector_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Connector not found")
+    return {"status": "revoked", "connector_id": req.connector_id}
+
+
+@app.get("/api/connectors", response_model=List[ConnectorInfo])
+def list_connectors():
+    return [ConnectorInfo(**c) for c in connectors.list_connectors()]
+
+
+@app.get("/api/connectors/{connector_id}/usage")
+def connector_usage(connector_id: str):
+    if connectors.get_connector(connector_id) is None:
+        raise HTTPException(status_code=404, detail="Connector not found")
+    return {"connector_id": connector_id, "usage": connectors.usage_log_for(connector_id)}
+
+
+# --------------------------------------------------------------------------
 # Multi-hop graph reasoning — see graph_reasoning.py
 # --------------------------------------------------------------------------
 # --------------------------------------------------------------------------
@@ -206,6 +246,8 @@ def eval_benchmark():
 # --------------------------------------------------------------------------
 @app.post("/api/asr/transcribe", response_model=ASRResponse)
 def asr_transcribe(req: ASRRequest):
+    if not req.external_processing_consent:
+        raise HTTPException(status_code=403, detail="Explicit consent is required before sending audio to speech providers.")
     """
     Transcribes recorded audio to text using Sarvam Saaras. The
     returned text is meant to be dropped straight into the same query box a
@@ -220,6 +262,8 @@ def asr_transcribe(req: ASRRequest):
 
 @app.post("/api/tts/synthesize", response_model=TTSResponse)
 def tts_synthesize(req: TTSRequest):
+    if not req.external_processing_consent:
+        raise HTTPException(status_code=403, detail="Explicit consent is required before sending text to speech providers.")
     if req.language not in ("en", "hi", "te", "ta", "ml", "sa"):
         raise HTTPException(status_code=400, detail="language must be one of en, hi, te, ta, ml, sa.")
     audio = asr.synthesize(req.text, req.language, req.speaker)
@@ -230,6 +274,8 @@ def tts_synthesize(req: TTSRequest):
 
 @app.post("/api/translate")
 def translate_batch(req: TranslateBatchRequest):
+    if not req.external_processing_consent:
+        raise HTTPException(status_code=403, detail="Explicit consent is required before sending text to translation providers.")
     results = []
     for text in req.texts:
         if len(text) > 6000:
@@ -670,6 +716,7 @@ def analyze_with_session(req: SessionAnalyzeRequest, authorization: Optional[str
         "confirmed_category": req.confirmed_category,
         "use_connector_id": req.use_connector_id,
         "query_depth": req.query_depth,
+        "external_processing_consent": req.external_processing_consent,
         "jur": jur,
     }
     response_fields = dag.run_analyze_pipeline(initial_state)
@@ -706,10 +753,166 @@ def account_delete(authorization: Optional[str] = Header(default=None)):
 
 
 # ==========================================================================
+# Citizen Claims Submission Workflow — /api/v1/claims
+# ==========================================================================
+@app.post("/api/v1/claims")
+def submit_claim(req: ClaimSubmitRequest, request: Request, authorization: Optional[str] = Header(default=None)):
+    """Submit a formulated IP claim for tracking (Pending → Verified → Anchored)."""
+    user = _current_user(authorization)
+    if not auth.login_limiter.allow("claims|" + _client_key(request)):
+        raise HTTPException(status_code=429, detail="Too many claim submissions. Try again later.")
+    user_id = user["id"]
+    return claims_workflow.submit_claim(
+        req.title, req.description, req.jurisdiction, req.category, user_id
+    )
+
+
+@app.get("/api/v1/claims")
+def list_claims_endpoint(
+    status: Optional[str] = None,
+    limit: int = Query(default=50, ge=1, le=100),
+    authorization: Optional[str] = Header(default=None),
+):
+    """List claims. Authenticated citizens see their own; admins see all."""
+    user = _current_user(authorization)
+    role = admin_auth.get_user_role(user["id"])
+    uid = None if role == "admin" else user["id"]
+    return claims_workflow.list_claims(user_id=uid, status=status, limit=limit)
+
+
+@app.get("/api/v1/claims/{claim_id}")
+def get_claim_endpoint(claim_id: str, authorization: Optional[str] = Header(default=None)):
+    user = _current_user(authorization)
+    claim = claims_workflow.get_claim(claim_id)
+    if claim is None or (admin_auth.get_user_role(user["id"]) != "admin" and claim["user_id"] != user["id"]):
+        raise HTTPException(status_code=404, detail="Claim not found")
+    return claim
+
+
+@app.post("/api/v1/claims/{claim_id}/verify")
+def verify_claim_endpoint(claim_id: str, authorization: Optional[str] = Header(default=None)):
+    """Admin action: advance a Pending claim to Verified."""
+    user = _current_user(authorization)
+    try:
+        admin_auth.require_admin(user)
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    try:
+        return claims_workflow.verify_claim(claim_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/api/v1/claims/{claim_id}/anchor")
+def anchor_claim_endpoint(claim_id: str, authorization: Optional[str] = Header(default=None)):
+    """Admin action: anchor a Verified claim (simulated blockchain hash)."""
+    user = _current_user(authorization)
+    try:
+        admin_auth.require_admin(user)
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    try:
+        return claims_workflow.anchor_claim(claim_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+# ==========================================================================
+# Citizen Formulation Dossiers — /api/v1/dossiers
+# ==========================================================================
+@app.post("/api/v1/dossiers")
+def create_dossier_endpoint(req: DossierCreateRequest, authorization: Optional[str] = Header(default=None)):
+    user = _current_user(authorization)
+    return dossiers.create(
+        user["id"], req.name, req.ingredients, req.sourcing_type,
+        req.indication, req.target_market,
+    )
+
+
+@app.get("/api/v1/dossiers")
+def list_dossiers_endpoint(authorization: Optional[str] = Header(default=None)):
+    user = _current_user(authorization)
+    return dossiers.list_for_user(user["id"])
+
+
+@app.get("/api/v1/dossiers/{dossier_id}")
+def get_dossier_endpoint(dossier_id: str, authorization: Optional[str] = Header(default=None)):
+    user = _current_user(authorization)
+    dossier = dossiers.get_for_user(dossier_id, user["id"])
+    if dossier is None:
+        raise HTTPException(status_code=404, detail="Dossier not found.")
+    return dossier
+
+
+@app.patch("/api/v1/dossiers/{dossier_id}")
+def update_dossier_endpoint(
+    dossier_id: str,
+    req: DossierUpdateRequest,
+    authorization: Optional[str] = Header(default=None),
+):
+    user = _current_user(authorization)
+    dossier = dossiers.update_for_user(
+        dossier_id, user["id"], req.model_dump(exclude_unset=True)
+    )
+    if dossier is None:
+        raise HTTPException(status_code=404, detail="Dossier not found.")
+    return dossier
+
+
+@app.delete("/api/v1/dossiers/{dossier_id}")
+def delete_dossier_endpoint(dossier_id: str, authorization: Optional[str] = Header(default=None)):
+    user = _current_user(authorization)
+    if not dossiers.delete_for_user(dossier_id, user["id"]):
+        raise HTTPException(status_code=404, detail="Dossier not found.")
+    return {"status": "deleted"}
+
+
+@app.post("/api/v1/dossiers/{dossier_id}/classify")
+def classify_dossier_endpoint(
+    dossier_id: str,
+    req: DossierClassifyRequest,
+    authorization: Optional[str] = Header(default=None),
+):
+    user = _current_user(authorization)
+    dossier = dossiers.classify_for_user(dossier_id, user["id"], req.confirmed_category)
+    if dossier is None:
+        raise HTTPException(status_code=404, detail="Dossier not found.")
+    return dossier
+
+
+@app.post("/api/v1/dossiers/{dossier_id}/map")
+def map_dossier_endpoint(dossier_id: str, authorization: Optional[str] = Header(default=None)):
+    user = _current_user(authorization)
+    try:
+        dossier = dossiers.map_for_user(dossier_id, user["id"])
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error))
+    if dossier is None:
+        raise HTTPException(status_code=404, detail="Dossier not found.")
+    return dossier
+
+
+@app.post("/api/v1/dossiers/{dossier_id}/review")
+def review_dossier_endpoint(
+    dossier_id: str,
+    req: DossierReviewRequest,
+    authorization: Optional[str] = Header(default=None),
+):
+    user = _current_user(authorization)
+    try:
+        dossier = dossiers.review_for_user(dossier_id, user["id"], req.note)
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error))
+    if dossier is None:
+        raise HTTPException(status_code=404, detail="Dossier not found.")
+    return dossier
+
+
+# ==========================================================================
 # Deep Patent Collision Radar — /api/v1/radar  (admin side)
 # ==========================================================================
 @app.post("/api/v1/radar")
-def radar_endpoint(req: RadarRequest, authorization: Optional[str] = Header(default=None)):
+def radar_endpoint(req: RadarRequest, request: Request, authorization: Optional[str] = Header(default=None)):
     """Cross-reference a new patent filing against TKDL to detect bio-piracy.
     Admin/ministry endpoint — requires admin role."""
     user = _current_user(authorization)
@@ -717,10 +920,53 @@ def radar_endpoint(req: RadarRequest, authorization: Optional[str] = Header(defa
         admin_auth.require_admin(user)
     except PermissionError as e:
         raise HTTPException(status_code=403, detail=str(e))
+    if not auth.login_limiter.allow("radar|" + _client_key(request)):
+        raise HTTPException(status_code=429, detail="Too many radar requests. Please try again later.")
     return radar.run_radar(
         req.patent_title, req.patent_abstract,
         req.patent_claims, req.filing_office, req.filing_date,
     )
+
+
+# ==========================================================================
+# Citizen Prahari Patent Watchlist — /api/v1/prahari
+# ==========================================================================
+@app.post("/api/v1/prahari")
+def create_prahari_alert_endpoint(
+    req: PrahariAlertCreateRequest,
+    authorization: Optional[str] = Header(default=None),
+):
+    user = _current_user(authorization)
+    try:
+        return prahari.create(
+            user["id"], req.filing_number, req.title, req.abstract,
+            req.publication_date, req.stream, req.source_url,
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error))
+
+
+@app.get("/api/v1/prahari")
+def list_prahari_alerts_endpoint(authorization: Optional[str] = Header(default=None)):
+    user = _current_user(authorization)
+    return prahari.list_for_user(user["id"])
+
+
+@app.get("/api/v1/prahari/{alert_id}")
+def get_prahari_alert_endpoint(alert_id: str, authorization: Optional[str] = Header(default=None)):
+    user = _current_user(authorization)
+    alert = prahari.get_for_user(alert_id, user["id"])
+    if alert is None:
+        raise HTTPException(status_code=404, detail="Watchlist filing not found.")
+    return alert
+
+
+@app.delete("/api/v1/prahari/{alert_id}")
+def delete_prahari_alert_endpoint(alert_id: str, authorization: Optional[str] = Header(default=None)):
+    user = _current_user(authorization)
+    if not prahari.delete_for_user(alert_id, user["id"]):
+        raise HTTPException(status_code=404, detail="Watchlist filing not found.")
+    return {"status": "deleted"}
 
 
 # ==========================================================================
@@ -731,6 +977,8 @@ def ocr_endpoint(req: OCRRequest, request: Request, authorization: Optional[str]
     """Upload a base64-encoded manuscript image; a vision-LLM extracts
     herbs, symptoms, and formulation steps into structured JSON."""
     _current_user(authorization)
+    if not req.external_processing_consent:
+        raise HTTPException(status_code=403, detail="Explicit consent is required before sending a manuscript image to the external vision provider.")
     if not auth.login_limiter.allow("ocr|" + _client_key(request)):
         raise HTTPException(status_code=429, detail="Too many OCR requests. Try again later.")
     try:
@@ -746,6 +994,9 @@ def ocr_endpoint(req: OCRRequest, request: Request, authorization: Optional[str]
         return ocr_digitize.digitise_manuscript(
             req.image_base64, req.mime_type, req.filename
         )
+    except ocr_digitize.OCRProviderError as e:
+        logger.warning("OCR provider unavailable: %s", e)
+        raise HTTPException(status_code=503, detail=str(e))
     except Exception as e:
         logger.exception("OCR digitisation failed")
         raise HTTPException(status_code=500, detail="OCR failed.")

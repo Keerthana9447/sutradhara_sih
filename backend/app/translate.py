@@ -166,8 +166,8 @@ def _bhashini_credentials() -> Optional[Tuple[str, str]]:
     # compatible fallback for a single-key setup (translation only, no ASR).
     user_id = os.getenv("BHASHINI_NMT_USER_ID") or os.getenv("BHASHINI_USER_ID")
     api_key = os.getenv("BHASHINI_NMT_API_KEY") or os.getenv("BHASHINI_API_KEY")
-    if user_id and api_key and user_id.strip() and api_key.strip():
-        return user_id.strip(), api_key.strip()
+    if user_id and api_key:
+        return user_id, api_key
     return None
 
 
@@ -183,8 +183,7 @@ def _bhashini_translate_one(text: str, source: str, target: str) -> Optional[str
         return None
     user_id, api_key = creds
 
-    raw_pid = os.getenv("BHASHINI_NMT_PIPELINE_ID") or os.getenv("BHASHINI_PIPELINE_ID") or _BHASHINI_DEFAULT_NMT_PIPELINE_ID
-    pipeline_id = raw_pid.strip()
+    pipeline_id = os.getenv("BHASHINI_NMT_PIPELINE_ID", os.getenv("BHASHINI_PIPELINE_ID", _BHASHINI_DEFAULT_NMT_PIPELINE_ID))
     headers = {
         "Content-Type": "application/json",
         "userID": user_id,

@@ -15,7 +15,7 @@ function splitText(text, limit = 5500) {
   return pieces
 }
 
-export default function useTranslatedStrings(language, source) {
+export default function useTranslatedStrings(language, source, externalProcessingConsent = false) {
   const serialized = JSON.stringify(source)
   const [translated, setTranslated] = useState({})
   const [available, setAvailable] = useState(true)
@@ -24,9 +24,9 @@ export default function useTranslatedStrings(language, source) {
   useEffect(() => {
     const sourceEntries = Object.entries(JSON.parse(serialized))
     const entries = sourceEntries.filter(([, value]) => typeof value === 'string' && value.length > 0)
-    if (language === 'en' || entries.length === 0) {
+    if (language === 'en' || entries.length === 0 || !externalProcessingConsent) {
       setTranslated(Object.fromEntries(Object.entries(JSON.parse(serialized))))
-      setAvailable(true)
+      setAvailable(language === 'en' || entries.length === 0)
       setPending(false)
       return undefined
     }
@@ -41,7 +41,7 @@ export default function useTranslatedStrings(language, source) {
     )
     const batches = []
     for (let i = 0; i < pieces.length; i += 100) batches.push(pieces.slice(i, i + 100))
-    Promise.all(batches.map((batch) => api.translateTexts(batch.map(({ piece }) => piece), language)))
+    Promise.all(batches.map((batch) => api.translateTexts(batch.map(({ piece }) => piece), language, externalProcessingConsent)))
       .then((responses) => {
         if (cancelled) return
         const translatedPieces = new Map()
@@ -82,7 +82,7 @@ export default function useTranslatedStrings(language, source) {
       })
 
     return () => { cancelled = true }
-  }, [language, serialized])
+  }, [language, serialized, externalProcessingConsent])
 
   return {
     text: (key) => translated[key] ?? source[key] ?? '',

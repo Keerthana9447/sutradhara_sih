@@ -8,8 +8,8 @@ vision-language model to extract:
   - Formulation steps
   - Language / script detected
 
-Falls back to a structured placeholder response when no vision-LLM is
-configured so the endpoint always responds.
+Returns an explicit provider error when OCR is unconfigured or the vision
+provider rejects the request; it never presents an empty placeholder as OCR.
 """
 
 import base64
@@ -22,9 +22,14 @@ from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger("ip_sakti.ocr")
 
+
+class OCRProviderError(RuntimeError):
+    """Raised when the configured vision provider cannot return OCR output."""
+
+
 GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "").strip()
-GROQ_VISION_MODEL = os.environ.get("GROQ_VISION_MODEL", "meta-llama/llama-4-scout-17b-16e-instruct").strip()
+GROQ_VISION_MODEL = os.environ.get("GROQ_VISION_MODEL", "qwen/qwen3.8-27b").strip()
 _TIMEOUT = float(os.environ.get("GROQ_TIMEOUT_SECONDS", "25"))
 
 _OCR_SYSTEM_PROMPT = (
@@ -47,9 +52,11 @@ _OCR_SYSTEM_PROMPT = (
 
 def _call_vision_llm(image_base64: str, mime_type: str = "image/jpeg") -> Optional[Dict[str, Any]]:
     if not GROQ_API_KEY:
-        return None
+        raise OCRProviderError(
+            "Manuscript OCR is not configured. Set GROQ_API_KEY for the backend."
+        )
     try:
-        import urllib.request, ssl
+        import urllib.error, urllib.request, ssl
         body = json.dumps({
             "model": GROQ_VISION_MODEL,
             "messages": [
@@ -75,25 +82,27 @@ def _call_vision_llm(image_base64: str, mime_type: str = "image/jpeg") -> Option
         raw = re.sub(r"\s*```$", "", raw.strip())
         return json.loads(raw)
     except Exception as exc:
+        if isinstance(exc, urllib.error.HTTPError):
+            try:
+                provider_error = json.loads(exc.read().decode("utf-8"))
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                provider_error = {}
+            details = provider_error.get("error", {}).get("message")
+            if not isinstance(details, str) or not details:
+                if exc.code in (401, 403):
+                    details = (
+                        f"HTTP {exc.code}; verify GROQ_API_KEY and vision-model access."
+                    )
+                else:
+                    details = f"HTTP {exc.code}"
+            logger.warning("OCR vision provider rejected request: %s", details)
+            raise OCRProviderError(
+                f"Vision provider rejected the OCR request: {details}"
+            ) from exc
         logger.warning("OCR vision LLM call failed: %s", exc)
-        return None
-
-
-def _placeholder_result() -> Dict[str, Any]:
-    return {
-        "script_detected": "Unknown (vision model unavailable)",
-        "language_detected": "Unknown",
-        "raw_transcription": "",
-        "herbs": [],
-        "symptoms_conditions": [],
-        "formulation_steps": [],
-        "confidence": 0.0,
-        "notes": (
-            "Vision-language model is not configured (GROQ_API_KEY not set or "
-            "vision model unavailable). Upload is accepted but text extraction "
-            "requires a configured vision LLM. Please configure GROQ_VISION_MODEL."
-        ),
-    }
+        raise OCRProviderError(
+            "Manuscript OCR provider failed. Check GROQ_VISION_MODEL and backend logs."
+        ) from exc
 
 
 def digitise_manuscript(
@@ -103,17 +112,18 @@ def digitise_manuscript(
 ) -> Dict[str, Any]:
     """Main entry point. Returns extracted structured data + metadata."""
     result = _call_vision_llm(image_base64, mime_type)
-    fallback_used = result is None
-    if fallback_used:
-        result = _placeholder_result()
+    if result is None:
+        raise OCRProviderError(
+            "Manuscript OCR provider returned no extraction. Check backend logs."
+        )
     return {
         "extracted": result,
         "digitised_at": datetime.datetime.utcnow().isoformat() + "Z",
         "filename": filename,
-        "fallback_used": fallback_used,
+        "fallback_used": False,
         "disclaimer": (
             "OCR extraction is AI-assisted and may contain errors. Human expert "
             "review of the raw transcription is essential before using extracted "
             "data in any legal or scholarly context."
         ),
-    }
+    }

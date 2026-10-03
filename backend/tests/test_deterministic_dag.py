@@ -110,6 +110,9 @@ def test_bounded_planner_executes_only_area_scoped_searches(monkeypatch):
         return [], "agentic_groq"
 
     monkeypatch.setattr(dag.llm, "plan_research", fake_plan_research)
+    monkeypatch.setattr(dag.llm, "_RESEARCH_PLANNER_ENABLED", True)
+    monkeypatch.setattr(dag.llm, "GROQ_API_KEY", "test-key")
+    monkeypatch.setattr(dag.privacy, "check_transfer", lambda *args: {"decision": "allowed"})
     calls = []
     source = {
         "id": "INTL-TRIPS-39",
@@ -130,6 +133,7 @@ def test_bounded_planner_executes_only_area_scoped_searches(monkeypatch):
         "jur": "International",
         "areas": ["Trade Secrets"],
         "query_variants": ["What does TRIPS say about trade secrets?"],
+        "external_processing_consent": True,
     }
     planned = dag._plan_research(state)
     retrieved = dag._retrieve({**state, **planned})["retrieved"]

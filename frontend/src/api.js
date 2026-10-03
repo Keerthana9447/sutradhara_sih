@@ -62,7 +62,7 @@ async function downloadPosturePdf(body) {
 
 export const api = {
   analyze: (payload) => post('/analyze', payload),
-  translateTexts: (texts, target_language) => post('/translate', { texts, target_language }),
+  translateTexts: (texts, target_language, external_processing_consent) => post('/translate', { texts, target_language, external_processing_consent }),
   analyzeSession: (payload) => post('/analyze/session', payload),
   graph: () => get('/graph'),
   graphReason: (payload) => post('/graph/reason', payload),
@@ -133,6 +133,30 @@ export const api = {
 
   // Radar (admin)
   runRadar: (payload) => post('/v1/radar', payload),
+
+  // Formulation dossiers (citizen)
+  createDossier: (payload) => post('/v1/dossiers', payload),
+  listDossiers: () => get('/v1/dossiers'),
+  updateDossier: (id, payload) => fetch(`${BASE}/v1/dossiers/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...authHeaders('/v1/') },
+    body: JSON.stringify(payload),
+  }).then((r) => jsonOrThrow(r, '/v1/dossiers')),
+  classifyDossier: (id, payload = {}) => post(`/v1/dossiers/${encodeURIComponent(id)}/classify`, payload),
+  mapDossier: (id) => post(`/v1/dossiers/${encodeURIComponent(id)}/map`, {}),
+  reviewDossier: (id, payload = {}) => post(`/v1/dossiers/${encodeURIComponent(id)}/review`, payload),
+  deleteDossier: (id) => fetch(`${BASE}/v1/dossiers/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    headers: authHeaders('/v1/'),
+  }).then((r) => jsonOrThrow(r, '/v1/dossiers')),
+
+  // Prahari patent watchlist (citizen)
+  createPrahariAlert: (payload) => post('/v1/prahari', payload),
+  listPrahariAlerts: () => get('/v1/prahari'),
+  deletePrahariAlert: (id) => fetch(`${BASE}/v1/prahari/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    headers: authHeaders('/v1/'),
+  }).then((r) => jsonOrThrow(r, '/v1/prahari')),
 
   // Admin signup
   adminSignUp: (payload) => post('/v1/auth/admin-signup', payload),

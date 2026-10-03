@@ -115,18 +115,25 @@ def test_account_deletion_removes_legacy_personal_records(fresh_db, user):
     assert deleted["consent_access_log"] == 1
 
 
-def test_removed_workflow_routes_are_not_registered():
+def test_unimplemented_legacy_workflow_routes_are_not_registered():
     removed_paths = {
-        "/api/v1/draft", "/api/v1/dossiers", "/api/v1/dossiers/{dossier_id}",
-        "/api/v1/prahari", "/api/v1/prahari/{alert_id}", "/api/v1/form7a",
+        "/api/v1/draft", "/api/v1/form7a",
         "/api/v1/prahari/{alert_id}/form7a", "/api/cultivator/assessment",
         "/api/v1/broadcasts", "/api/v1/broadcasts/publish",
         "/api/v1/broadcasts/{broadcast_id}", "/api/v1/enhance-broadcast",
-        "/api/v1/dossiers/{dossier_id}/classify", "/api/v1/dossiers/{dossier_id}/map",
-        "/api/v1/dossiers/{dossier_id}/review", "/api/v1/dossiers/{dossier_id}/objections",
+        "/api/v1/dossiers/{dossier_id}/objections",
     }
     registered = {route.path for route in app.routes}
     assert removed_paths.isdisjoint(registered)
+    assert {
+        "/api/v1/dossiers",
+        "/api/v1/dossiers/{dossier_id}",
+        "/api/v1/dossiers/{dossier_id}/classify",
+        "/api/v1/dossiers/{dossier_id}/map",
+        "/api/v1/dossiers/{dossier_id}/review",
+        "/api/v1/prahari",
+        "/api/v1/prahari/{alert_id}",
+    } <= registered
 
 
 def test_deep_query_depth_increases_retrieval_cap(monkeypatch):

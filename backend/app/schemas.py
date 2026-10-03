@@ -8,7 +8,14 @@ class AnalyzeRequest(BaseModel):
     language: str = Field(default="en", description="'en', 'te', 'hi', 'ta', 'ml', or 'sa'")
     # Optional pre-confirmed classification (from the clarification step)
     confirmed_category: Optional[str] = None
+    # Optional: use the caller's own linked paid-subscription connector for
+    # this one query (see app/connectors.py). Every use is explicitly opt-in
+    # per request — never silently applied to every query just because a
+    # connector exists — and every use is logged.
+    use_connector_id: Optional[str] = None
     query_depth: Literal["quick", "guided", "deep"] = "guided"
+    # Per-request permission before sending user text to external AI/translation providers.
+    external_processing_consent: bool = False
 
 
 class ClassificationResult(BaseModel):
@@ -75,6 +82,10 @@ class AnalyzeResponse(BaseModel):
     # applicable to this category, or when nothing cleared the similarity
     # floor — never padded with a weak match.
     tk_similarity: Optional[List[dict]] = None
+    # Present only when use_connector_id was set on the request AND the
+    # connector is active. Live provider results are kept separate from the
+    # legal corpus sources and are explicitly marked as live or simulated.
+    connector_source_used: Optional[dict] = None
     # Live, per-query explainability graph — built from what was ACTUALLY
     # retrieved for THIS query (see app/graph.py), distinct from the static
     # schema view at GET /api/graph and the manual what-if multi-hop tool at
@@ -207,6 +218,30 @@ class PostureRequest(BaseModel):
 
 
 # --------------------------------------------------------------------------
+# Paid-subscription connector (consent-logged, user-linked) — see connectors.py
+# --------------------------------------------------------------------------
+class ConnectorLinkRequest(BaseModel):
+    provider: str = Field(..., description="Provider name; 'USPTO PatentsView' enables the live US-patent adapter")
+    api_key: str = Field(..., description="Provider API key; PatentsView keys are encrypted at rest and never returned")
+    scope: str = Field(default="patent_search", description="What this connector may be used for")
+    contact_email: Optional[str] = None
+
+
+class ConnectorInfo(BaseModel):
+    connector_id: str
+    provider: str
+    scope: str
+    status: str  # "active" | "revoked"
+    linked_at: str
+    revoked_at: Optional[str] = None
+    key_fingerprint: str  # last 4 characters only — proves which key without exposing it
+
+
+class ConnectorRevokeRequest(BaseModel):
+    connector_id: str
+
+
+# --------------------------------------------------------------------------
 # Multi-hop graph reasoning — see graph_reasoning.py
 # --------------------------------------------------------------------------
 class GraphReasonRequest(BaseModel):
@@ -223,6 +258,7 @@ class ASRRequest(BaseModel):
     source_language: str = Field(default="en", description="'en', 'hi', 'te', 'ta', or 'ml' — language actually spoken")
     audio_format: str = Field(default="wav", description="Audio container/codec, e.g. 'wav', 'webm'")
     sampling_rate: int = Field(default=16000, description="Audio sample rate in Hz")
+    external_processing_consent: bool = False
 
 
 class ASRResponse(BaseModel):
@@ -235,6 +271,7 @@ class TTSRequest(BaseModel):
     text: str = Field(..., min_length=1, max_length=2500)
     language: str = Field(default="en")
     speaker: str = Field(default="shubh")
+    external_processing_consent: bool = False
 
 
 class TTSResponse(BaseModel):
@@ -244,6 +281,7 @@ class TTSResponse(BaseModel):
 class TranslateBatchRequest(BaseModel):
     texts: List[str] = Field(..., min_length=1, max_length=100)
     target_language: str = Field(..., pattern="^(en|hi|te|ta|ml|sa)$")
+    external_processing_consent: bool = False
 
 
 # --------------------------------------------------------------------------
@@ -298,6 +336,20 @@ class SessionAnalyzeRequest(AnalyzeRequest):
 
 
 # --------------------------------------------------------------------------
+# Citizen Claims Submission Workflow — /api/v1/claims
+# --------------------------------------------------------------------------
+class ClaimSubmitRequest(BaseModel):
+    title: str = Field(..., min_length=1, max_length=300, description="Short title for the claim")
+    description: str = Field(..., min_length=1, max_length=12000, description="Detailed description of the formulation or TK")
+    jurisdiction: str = Field(default="India")
+    category: Optional[str] = Field(default=None, description="Product category if known")
+
+
+class ClaimIdRequest(BaseModel):
+    claim_id: str
+
+
+# --------------------------------------------------------------------------
 # Deep Patent Collision Radar — /api/v1/radar
 # --------------------------------------------------------------------------
 class RadarRequest(BaseModel):
@@ -309,12 +361,49 @@ class RadarRequest(BaseModel):
 
 
 # --------------------------------------------------------------------------
+# Citizen formulation dossiers and Prahari patent watchlist
+# --------------------------------------------------------------------------
+class DossierCreateRequest(BaseModel):
+    name: str = Field(..., min_length=1, max_length=200)
+    ingredients: List[str] = Field(..., min_length=1, max_length=100)
+    sourcing_type: str = Field(..., min_length=1, max_length=200)
+    indication: str = Field(..., min_length=1, max_length=1000)
+    target_market: Literal["India", "International", "Both"] = "India"
+
+
+class DossierUpdateRequest(BaseModel):
+    name: Optional[str] = Field(default=None, min_length=1, max_length=200)
+    ingredients: Optional[List[str]] = Field(default=None, min_length=1, max_length=100)
+    sourcing_type: Optional[str] = Field(default=None, min_length=1, max_length=200)
+    indication: Optional[str] = Field(default=None, min_length=1, max_length=1000)
+    target_market: Optional[Literal["India", "International", "Both"]] = None
+
+
+class DossierClassifyRequest(BaseModel):
+    confirmed_category: Optional[str] = None
+
+
+class DossierReviewRequest(BaseModel):
+    note: Optional[str] = Field(default=None, max_length=2000)
+
+
+class PrahariAlertCreateRequest(BaseModel):
+    filing_number: str = Field(..., min_length=1, max_length=100)
+    title: str = Field(..., min_length=1, max_length=500)
+    abstract: str = Field(..., min_length=1, max_length=12000)
+    publication_date: str = Field(..., description="Patent publication date in YYYY-MM-DD format.")
+    stream: Literal["domestic", "foreign"]
+    source_url: Optional[str] = Field(default=None, max_length=2000)
+
+
+# --------------------------------------------------------------------------
 # Manuscript OCR / Digitisation — /api/v1/ocr
 # --------------------------------------------------------------------------
 class OCRRequest(BaseModel):
     image_base64: str = Field(..., min_length=1, max_length=7_000_000, description="Base64-encoded image, no data: URI prefix; maximum decoded size is 5 MiB")
     mime_type: Literal["image/jpeg", "image/png", "image/webp"] = Field(default="image/jpeg", description="Supported image MIME type")
     filename: Optional[str] = Field(default=None, max_length=255)
+    external_processing_consent: bool = False
 
 
 # --------------------------------------------------------------------------
@@ -325,4 +414,3 @@ class AdminSignUpRequest(BaseModel):
     name: str
     password: str = Field(..., min_length=6)
     invite_code: str = Field(..., description="Ministry admin invite code")
-

@@ -87,7 +87,7 @@ function RadarPanel() {
           {result.matches.map((m, i) => (
             <div key={i} className="border border-hairline rounded-md p-3.5 bg-paper/60">
               <div className="flex items-center justify-between gap-2 flex-wrap">
-                <p className="text-sm font-semibold">{m.tkdl_entry}</p>
+                <p className="text-sm font-semibold">{m.reference_entry}</p>
                 <span className={`text-[11px] px-2 py-0.5 rounded-full border ${
                   m.risk_level === "High" ? "border-rust/30 bg-rust/10 text-rust" :
                   m.risk_level === "Medium" ? "border-gold/30 bg-gold-light/10 text-gold-dark" :

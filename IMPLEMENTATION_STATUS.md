@@ -1,3 +1,18 @@
+# Round 7 — structured audience intake and external-processing consent
+
+Added to close concrete PS26045 and privacy gaps:
+
+- The analysis form now captures an audience profile (cultivator/grower, practitioner, researcher, AYUSH startup/MSME, or other), optional ingredients/biological resources, and sourcing region/provenance. Labels are available in all six supported UI languages.
+- External-processing consent is explicit and defaults off. Without it, non-English query normalization uses local fallback, Groq planning/paraphrasing are skipped, output translation remains unavailable, and ASR/TTS/translation/OCR API routes reject calls with HTTP 403; OCR calls use the authenticated API client and keep the existing cross-border check. Dynamic UI translations also stay local.
+- Groq research planning and paraphrasing check the configured cross-border destination list before sending data; blocked transfers fall back to deterministic/local behavior.
+- Added unit and route tests for missing consent and blocked transfer behavior.
+
+Verification in this environment: full backend suite — **267 passed, 5 skipped**. Frontend Vite build could not run because the bundler is denied access while resolving paths above the workspace; esbuild successfully parsed all 32 frontend JS/JSX source files.
+
+This does not make the project fully compliant with every statement requirement. The actual TKDL remains access-restricted; some commercial connectors are placeholders; the curated corpus is not an exhaustive, continuously verified legal corpus; and formal legal, language-quality, privacy, and AI-standard review/certification must be completed by appropriate external reviewers.
+
+---
+
 # Implementation status — this round
 
 Two features were taken from 🟡 Partial to further-closed 🟡 (real, tested

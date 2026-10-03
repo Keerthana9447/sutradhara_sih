@@ -10,7 +10,7 @@
  */
 import {
   BarChart3, Copyright, Droplet, FileCheck2, Gavel, Leaf, Lock, MapPin,
-  Megaphone, PenTool, Pill, PlugZap, Scale, ScrollText, Share2, ShieldCheck,
+  Megaphone, PenTool, Pill, Scale, ScrollText, Share2, ShieldCheck,
   Sparkles, Sprout, Stamp, Tag, Tags, Utensils, Waypoints,
 } from 'lucide-react'
 
@@ -49,7 +49,6 @@ const NAV_ICONS = {
   abs: ShieldCheck,
   tkdl: ScrollText,
   graph: Waypoints,
-  connectors: PlugZap,
   eval: BarChart3,
 }
 

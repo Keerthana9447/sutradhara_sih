@@ -164,13 +164,14 @@ def test_requested_category_and_abstention_routes():
     assert not jurisdiction.has_unsupported_foreign_country(CLASSICAL_QUERY, "International")
 
 
-def test_plant_identity_and_prior_art_questions_do_not_imply_classical_category():
-    for query in (
-        "Does turmeric wound healing count as prior art?",
-        "Does using a neem extract require biodiversity approval?",
-        "My formula uses a medicinal plant from a forest region; what is its provenance status?",
+def test_legal_intent_without_product_details_does_not_imply_classical_category():
+    for query, expected_intent in (
+        ("Does turmeric wound healing count as prior art?", "Traditional Knowledge"),
+        ("Does using a neem extract require biodiversity approval?", "Access and Benefit Sharing"),
+        ("My formula uses a medicinal plant from a forest region; what is its provenance status?",
+         "General IP / Regulatory Guidance"),
     ):
         result = classifier.classify(query)
-        assert result.needs_clarification, (query, result)
-
-
+        assert result.category == "Unknown / Not Required", (query, result)
+        assert result.intent == expected_intent, (query, result)
+        assert not result.needs_clarification, (query, result)

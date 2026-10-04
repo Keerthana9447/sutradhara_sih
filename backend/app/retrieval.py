@@ -13,11 +13,12 @@ import re
 import threading
 from collections import Counter
 from typing import Any, Dict, List, Union
+from .corpus_validation import validate_corpus
 
 logger = logging.getLogger("ip_sakti.retrieval")
 _CORPUS_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "corpus.json")
 with open(_CORPUS_PATH, "r", encoding="utf-8") as f:
-    _CORPUS: List[Dict[str, Any]] = json.load(f)
+    _CORPUS: List[Dict[str, Any]] = validate_corpus(json.load(f))
 _CORPUS_BY_ID = {doc["id"]: doc for doc in _CORPUS}
 # Give the source title and section more weight than explanatory prose so a
 # focused query for a named instrument ranks its governing source first.

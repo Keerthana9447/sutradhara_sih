@@ -50,6 +50,20 @@ _CATEGORY_DEFAULT_AREAS = {
     "Cosmetic": ["Cosmetic regulation", "Trademarks", "Labelling"],
 }
 
+_INTENT_DEFAULT_AREAS = {
+    "Patent / Patentability": ["Patents"],
+    "Traditional Knowledge": ["Traditional Knowledge"],
+    "Access and Benefit Sharing": ["Access-and-Benefit-Sharing"],
+    "Trade Secrets / Confidential Information": ["Trade Secrets"],
+    "Geographical Indications": ["Geographical Indications"],
+    "Trademarks": ["Trademarks"],
+    "Copyright": ["Copyright"],
+    "Designs": ["Designs"],
+    "Plant Variety Protection": ["Plant Variety Protection"],
+    "Drug Regulation": ["Drug regulation"],
+    "Food / Nutraceutical": ["Food / nutraceutical regulation"],
+    "Cosmetic": ["Cosmetic regulation"],
+}
 
 def resolve_jurisdiction(jurisdiction: str) -> str:
     if jurisdiction not in VALID_JURISDICTIONS:
@@ -57,12 +71,19 @@ def resolve_jurisdiction(jurisdiction: str) -> str:
     return jurisdiction
 
 
-def route_areas(query: str, category: str) -> List[str]:
+def route_areas(query: str, category: str, intent: str = "") -> List[str]:
     """Only return areas relevant to this specific query — never dump the full list."""
     q = query.lower()
     matched = []
     for area, kws in _AREA_KEYWORDS.items():
         if any(kw in q for kw in kws):
+            matched.append(area)
+
+    # Explicit intent is the first-stage classifier output. Fold its canonical
+    # area in even when the user's wording uses a synonym not covered by the
+    # phrase matcher (e.g. "access-and-benefit-sharing").
+    for area in _INTENT_DEFAULT_AREAS.get(intent, []):
+        if area not in matched:
             matched.append(area)
 
     # Fold in the category's typical areas so the routing isn't purely
@@ -71,4 +92,6 @@ def route_areas(query: str, category: str) -> List[str]:
         if area not in matched:
             matched.append(area)
 
-    return matched[:4] if matched else _CATEGORY_DEFAULT_AREAS.get(category, ["Patents"])[:4]
+    if matched:
+        return matched[:4]
+    return _CATEGORY_DEFAULT_AREAS.get(category, ["Patents"])[:4]

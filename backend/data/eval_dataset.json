@@ -1,6 +1,7 @@
 [
   {
     "id": "EV-01",
+    "expected_intent": "Patent / Patentability",
     "query": "Can I patent a classical Ayurvedic formulation that is already described in a traditional Ayurvedic text?",
     "jurisdiction": "India",
     "language": "en",
@@ -14,6 +15,7 @@
   },
   {
     "id": "EV-02",
+    "expected_intent": "General IP / Regulatory Guidance",
     "query": "I developed a new Ayurvedic formulation that is not found in a classical text. What IP and regulatory considerations should I check?",
     "jurisdiction": "India",
     "language": "en",
@@ -27,6 +29,7 @@
   },
   {
     "id": "EV-03",
+    "expected_intent": "Patent / Patentability",
     "query": "Can I patent a classical Ayurvedic formulation that is already described in a traditional Ayurvedic text?",
     "jurisdiction": "International",
     "language": "en",
@@ -39,6 +42,7 @@
   },
   {
     "id": "EV-04",
+    "expected_intent": "Food / Nutraceutical",
     "query": "I want to sell a herbal nutraceutical supplement made from ashwagandha as a health food.",
     "jurisdiction": "India",
     "language": "en",
@@ -50,6 +54,7 @@
   },
   {
     "id": "EV-05",
+    "expected_intent": "Cosmetic",
     "query": "Is my product a cosmetic or a drug if it is a herbal face cream for skin whitening with no therapeutic claim?",
     "jurisdiction": "India",
     "language": "en",
@@ -61,6 +66,7 @@
   },
   {
     "id": "EV-06",
+    "expected_intent": "Drug Regulation",
     "query": "I have developed a standardized purified botanical extract as a phytopharmaceutical drug.",
     "jurisdiction": "India",
     "language": "en",
@@ -72,6 +78,7 @@
   },
   {
     "id": "EV-07",
+    "expected_intent": "Out of Scope",
     "query": "What is the boiling point of tungsten?",
     "jurisdiction": "India",
     "language": "en",
@@ -83,6 +90,7 @@
   },
   {
     "id": "EV-08",
+    "expected_intent": "Out of Scope",
     "query": "What quantum computing patent rules apply to my Ayurvedic formulation?",
     "jurisdiction": "India",
     "language": "en",
@@ -94,10 +102,11 @@
   },
   {
     "id": "EV-09",
+    "expected_intent": "Patent / Patentability",
     "query": "Can I patent my Ayurvedic formulation in Japan while I am based in India?",
     "jurisdiction": "India",
     "language": "en",
-    "expect_clarification": true,
+    "expect_clarification": false,
     "expect_abstain": true,
     "expected_category": null,
     "expected_source_ids": [],
@@ -105,6 +114,7 @@
   },
   {
     "id": "EV-10",
+    "expected_intent": "General IP / Regulatory Guidance",
     "query": "Tell me about my Ayurvedic product.",
     "jurisdiction": "India",
     "language": "en",
@@ -116,6 +126,7 @@
   },
   {
     "id": "EV-11",
+    "expected_intent": "Access and Benefit Sharing",
     "query": "Does using a rare forest plant in my formulation require any biodiversity approval?",
     "jurisdiction": "India",
     "language": "en",
@@ -131,6 +142,7 @@
   },
   {
     "id": "EV-12",
+    "expected_intent": "Geographical Indications",
     "query": "Can I register a geographical indication for a formulation unique to my region?",
     "jurisdiction": "India",
     "language": "en",
@@ -144,6 +156,7 @@
   },
   {
     "id": "EV-13",
+    "expected_intent": "Access and Benefit Sharing",
     "query": "I am patenting a new Ayurvedic formulation based on genetic resources or traditional knowledge from a local community. What country-of-origin disclosure is required internationally?",
     "jurisdiction": "International",
     "language": "en",
@@ -158,6 +171,7 @@
   },
   {
     "id": "EV-14",
+    "expected_intent": "Patent / Patentability",
     "query": "I want to patent a fermented probiotic Ayurvedic formulation that relies on a specific microbial strain deposit. What international treaty covers depositing that microorganism?",
     "jurisdiction": "International",
     "language": "en",
@@ -172,6 +186,7 @@
   },
   {
     "id": "EV-15",
+    "expected_intent": "Patent / Patentability",
     "query": "What is the current timeline for filing a request for examination under the latest 2024 patent rules in India?",
     "jurisdiction": "India",
     "language": "en",
@@ -186,6 +201,7 @@
   },
   {
     "id": "EV-16",
+    "expected_intent": "Access and Benefit Sharing",
     "query": "What is the new online National Biodiversity Authority approval procedure under the 2024 biological diversity rules?",
     "jurisdiction": "India",
     "language": "en",
@@ -200,6 +216,7 @@
   },
   {
     "id": "EV-17",
+    "expected_intent": "Patent / Patentability",
     "query": "సాంప్రదాయ ఆయుర్వేద గ్రంథంలో ఇప్పటికే వివరించబడిన ఒక శాస్త్రీయ ఆయుర్వేద ఫార్ములేషన్‌కు నేను పేటెంట్ పొందగలనా?",
     "jurisdiction": "India",
     "language": "te",
@@ -211,6 +228,7 @@
   },
   {
     "id": "EV-18",
+    "expected_intent": "Patent / Patentability",
     "query": "पारंपरिक आयुर्वेदिक ग्रंथ में पहले से वर्णित शास्त्रीय आयुर्वेदिक फॉर्मूलेशन के लिए क्या मैं पेटेंट प्राप्त कर सकता हूं?",
     "jurisdiction": "India",
     "language": "hi",
@@ -222,6 +240,7 @@
   },
   {
     "id": "EV-19",
+    "expected_intent": "Trademarks",
     "query": "I want to register a trademark brand name for my proprietary Ayurvedic medicine.",
     "jurisdiction": "India",
     "language": "en",
@@ -235,6 +254,7 @@
   },
   {
     "id": "EV-20",
+    "expected_intent": "Trademarks",
     "query": "I want to register a trademark brand name for my proprietary Ayurvedic medicine.",
     "jurisdiction": "International",
     "language": "en",
@@ -248,6 +268,7 @@
   },
   {
     "id": "EV-21",
+    "expected_intent": "Drug Regulation",
     "query": "I want to export a classical Ayurvedic herbal tablet from an authoritative text to the EU; what is the traditional herbal medicinal product registration route?",
     "jurisdiction": "International",
     "language": "en",
@@ -261,6 +282,7 @@
   },
   {
     "id": "EV-22",
+    "expected_intent": "Food / Nutraceutical",
     "query": "Can I sell my Ayurvedic herbal capsules in the United States as a dietary supplement under DSHEA?",
     "jurisdiction": "International",
     "language": "en",
@@ -274,12 +296,13 @@
   },
   {
     "id": "EV-23",
+    "expected_intent": "Access and Benefit Sharing",
     "query": "What Nagoya due diligence duties apply when a company in the EU develops a product from Indian medicinal plants?",
     "jurisdiction": "International",
     "language": "en",
     "expect_clarification": false,
     "expect_abstain": false,
-    "expected_category": "Classical / Generic Medicine",
+    "expected_category": null,
     "expected_source_ids": [
       "INTL-EU-NAGOYA-REG-511-2014"
     ],
@@ -287,12 +310,13 @@
   },
   {
     "id": "EV-24",
+    "expected_intent": "Trade Secrets / Confidential Information",
     "query": "Can I protect my proprietary Ayurvedic extraction process as a trade secret in India instead of patenting it?",
     "jurisdiction": "India",
     "language": "en",
     "expect_clarification": false,
     "expect_abstain": false,
-    "expected_category": "Patent / Proprietary Medicine",
+    "expected_category": null,
     "expected_source_ids": [
       "IN-TRADESECRET-COMMONLAW"
     ],
@@ -300,12 +324,13 @@
   },
   {
     "id": "EV-25",
+    "expected_intent": "Trade Secrets / Confidential Information",
     "query": "For my proprietary Ayurvedic extraction process, what international standard under TRIPS protects undisclosed information as a trade secret?",
     "jurisdiction": "International",
     "language": "en",
     "expect_clarification": false,
     "expect_abstain": false,
-    "expected_category": "Classical / Generic Medicine",
+    "expected_category": null,
     "expected_source_ids": [
       "INTL-TRIPS-39"
     ],
@@ -313,12 +338,13 @@
   },
   {
     "id": "EV-26",
+    "expected_intent": "Geographical Indications",
     "query": "எனது கிராமத்தில் மட்டும் விளையும் ஒரு தனித்துவமான மருத்துவ மூலிகைக்கு புவிசார் குறியீடு (GI) பதிவு செய்ய முடியுமா?",
     "jurisdiction": "India",
     "language": "ta",
     "expect_clarification": false,
     "expect_abstain": false,
-    "expected_category": "Classical / Generic Medicine",
+    "expected_category": null,
     "expected_source_ids": [
       "IN-GI-1999"
     ],
@@ -326,12 +352,13 @@
   },
   {
     "id": "EV-27",
+    "expected_intent": "Trademarks",
     "query": "എന്റെ ആയുർവേദ ഉൽപ്പന്നത്തിന്റെ ബ്രാൻഡ് നാമം ട്രേഡ്മാർക്കായി രജിസ്റ്റർ ചെയ്യാൻ കഴിയുമോ?",
     "jurisdiction": "India",
     "language": "ml",
     "expect_clarification": false,
     "expect_abstain": false,
-    "expected_category": "Patent / Proprietary Medicine",
+    "expected_category": null,
     "expected_source_ids": [
       "IN-TM-1999"
     ],
@@ -339,12 +366,13 @@
   },
   {
     "id": "EV-28",
+    "expected_intent": "Access and Benefit Sharing",
     "query": "किं मम औषधवनस्पत्युपयोगाय राष्ट्रियजैवविविधताप्राधिकरणस्य अनुमतिः आवश्यका?",
     "jurisdiction": "India",
     "language": "sa",
     "expect_clarification": false,
     "expect_abstain": false,
-    "expected_category": "Classical / Generic Medicine",
+    "expected_category": null,
     "expected_source_ids": [
       "IN-BDA-2002"
     ],
@@ -352,6 +380,7 @@
   },
   {
     "id": "EV-29",
+    "expected_intent": "Drug Regulation",
     "query": "How do I register a classical Ayurvedic herbal medicine for the UK under the MHRA traditional herbal registration route?",
     "jurisdiction": "International",
     "language": "en",
@@ -365,12 +394,13 @@
   },
   {
     "id": "EV-30",
+    "expected_intent": "Drug Regulation",
     "query": "How can I verify whether my Ayurvedic medicine has a Canadian natural health product licence and NPN?",
     "jurisdiction": "International",
     "language": "en",
     "expect_clarification": false,
     "expect_abstain": false,
-    "expected_category": "Classical / Generic Medicine",
+    "expected_category": null,
     "expected_source_ids": [
       "INTL-CA-NHP-2003"
     ],

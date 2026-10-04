@@ -14,12 +14,13 @@ function InvariantBadge({ ok, label, value }) {
   )
 }
 
-function MetricBar({ label, value }) {
+function MetricBar({ label, value, checked }) {
   const pct = value == null ? null : Math.round(value * 100)
   return (
     <div className="eval-metric-card rounded-md p-4">
       <p className="eval-metric-label text-sm font-semibold text-green-dark leading-snug">{label}</p>
       <p className="font-serif text-3xl text-green leading-none mt-2.5">{pct == null ? '—' : `${pct}%`}</p>
+      {checked != null && <p className="text-[11px] text-ink/45 mt-2">n={checked}</p>}
       {pct != null && (
         <div className="mt-3 h-1.5 bg-hairline/60 rounded-full overflow-hidden">
           <div className="h-full bg-gradient-to-r from-green-mid to-green rounded-full transition-[width] duration-700 ease-out" style={{ width: `${Math.min(pct, 100)}%` }} />
@@ -85,6 +86,14 @@ function BenchmarkSection({ copy }) {
             <MetricBar label={copy.eval.abstentionAccuracyLabel} value={report.abstention_accuracy} />
             <MetricBar label={copy.eval.clarificationAccuracy} value={report.clarification_accuracy} />
             <MetricBar label={copy.eval.citationHitRate} value={report.citation_hit_rate} />
+            <MetricBar label={copy.eval.intentAccuracy || 'Intent accuracy'} value={report.intent_accuracy} checked={report.intent_items_checked} />
+            <MetricBar label={copy.eval.jurisdictionAccuracy || 'Jurisdiction accuracy'} value={report.jurisdiction_accuracy} checked={report.jurisdiction_items_checked} />
+            <MetricBar label={copy.eval.productClassificationAccuracy || 'Product classification accuracy'} value={report.product_classification_accuracy} checked={report.product_classification_items_checked} />
+            <MetricBar label={copy.eval.expectedCitationCorrectness || 'Expected citation correctness'} value={report.expected_citation_correctness} checked={report.expected_citation_items_checked} />
+            <MetricBar label={copy.eval.answerGroundingRate || 'Answer grounding rate'} value={report.answer_grounding_rate} checked={report.answer_grounding_items_checked} />
+            <MetricBar label={copy.eval.supportedClaimRate || 'Supported claim rate'} value={report.supported_claim_rate} checked={report.claim_items_checked} />
+            <MetricBar label={copy.eval.citationSupportRate || 'Citation support rate'} value={report.citation_support_rate} checked={report.citation_support_items_checked} />
+            <MetricBar label={copy.eval.unsupportedAnswerRate || 'Unsupported answer rate'} value={report.unsupported_answer_rate} checked={report.answer_grounding_items_checked} />
           </div>
           <p className="text-[11px] text-ink/45 mt-4 leading-relaxed">
             {copy.eval.benchmarkItemCount.replace('{n}', report.total_items)}

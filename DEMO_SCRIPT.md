@@ -14,11 +14,15 @@ sentence of explanation.
 
 ## 0. Before you walk in (5-minute pre-flight checklist)
 
+- [ ] Keep the demo to the core feasibility slice: classify one question,
+      switch jurisdiction, show its evidence, then run the labeled benchmark.
+      Treat voice, PDF export, graph, and workspace features as optional; do
+      not add them if they put the five-minute run at risk.
 - [ ] Backend running, `GET /api/health` returns `"status": "ok"` — check
       this in a terminal tab you can glance at, not just trust it.
 - [ ] Frontend built/served and reachable — refresh it once, empty the
       textarea, confirm you're on the Analyze tab.
-- [ ] Run the exact 4 demo queries below **once, just now**, so nothing is
+- [ ] Run the core demo queries below **once, just now**, so nothing is
       a cold cache-miss on stage. Screenshot each result as a backup in case
       of a live network hiccup.
 - [ ] Have `LEGAL_CONTENT_REVIEW.md` open in a second tab — if asked about
@@ -109,17 +113,21 @@ statement will not have thought of.
 **Action:** Switch to the Evaluation tab.
 
 > "We didn't just test this by trying it a few times and hoping. This runs
-> 20 labeled test queries through the real system on every load and checks
-> two things that must always be zero: a source from the wrong jurisdiction
-> ever appearing in an answer, and a citation that doesn't match what was
-> actually retrieved. Both are zero, live, right now — not a number we
-> picked once and put in a slide."
+> 30 labeled examples through the real system and reports classification,
+> intent, jurisdiction, product classification when applicable,
+> clarification, abstention, expected-source retrieval, and citation-hit
+> metrics. It separately checks whether each numbered answer claim has one
+> citation and sufficient deterministic keyword overlap with that cited
+> corpus record. That is a claim/evidence regression signal, not proof that
+> the legal interpretation is correct. It also checks two hard invariants:
+> no wrong-jurisdiction source and no citation absent from the retrieved
+> evidence. These are prototype signals, not a legal-expert accuracy
+> certification."
 
-This is your strongest differentiator against 500 teams that will show 3–4
-cherry-picked good answers and call it done. Say the word "live" out loud —
-it's true, and it matters.
+Only report the invariant counts as zero after running the benchmark and
+confirming the displayed results; do not recite numbers from an old run.
 
-### 4:00–4:40 — Own the gaps before they're found (this is your best card)
+### 4:00–4:40 — Own the gaps and the next feasible stage
 
 > "Two things we want to be upfront about, because we think honesty here is
 > part of the pitch: first, our multilingual layer tries Bhashini — India's
@@ -130,9 +138,14 @@ it's true, and it matters.
 > IP review yet — we have a full written log of exactly what's verified and
 > what still needs that review [gesture at LEGAL_CONTENT_REVIEW.md], and
 > every single citation traces to a named, checkable source specifically so
-> that gap can be closed in minutes, not months, once we get that review."Judges have seen dozens of teams oversell. A team that names its own limits,
-precisely and without hand-wringing, reads as *more* credible, not less —
-but only if you say it confidently, in this tone, not apologetically.
+> that gap can be closed in minutes, not months, once we get that review."
+
+Then give the feasible next step: a controlled pilot starts with expert
+review of the highest-use corpus entries and benchmark labels, followed by
+native-speaker checks and AYUSH user testing. Registry and paid-source
+integrations come only after access and review arrangements are confirmed.
+Precise limits and a practical next step read as more credible than a claim
+of production readiness.
 
 ### 4:40–5:00 — Close
 

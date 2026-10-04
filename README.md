@@ -79,7 +79,7 @@ the evidence isn't there.
 | # | Feature | Where | What it actually does |
 |---|---|---|---|
 | 1 | **Dynamic multi-hop Knowledge Graph** | `app/graph_reasoning.py` → `POST /api/graph/reason` | Traced fresh from the live corpus for the chosen category/jurisdiction on **every call** — category → applicable IP area(s) → the actual corpus document(s) governing each — plus an optional, jurisdiction-isolated export-readiness branch. Not a static diagram. |
-| 2 | **Live Evaluation Benchmark** | `app/eval_runner.py` → `GET /api/eval/benchmark` | Runs a 30-item labeled test set through the actual running app; reports freshly computed classification/abstention/clarification accuracy and citation hit rate, plus two hard invariants (jurisdiction-isolation violations, citation-integrity violations) that must read zero. |
+| 2 | **Live Evaluation Benchmark** | `app/eval_runner.py` → `GET /api/eval/benchmark` | Runs a 30-item labeled test set through the actual running app; reports intent/product classification, jurisdiction, abstention/clarification, retrieval and citation metrics, deterministic claim-to-cited-corpus evidence overlap, and the two hard source/citation invariants. Evidence overlap is a regression signal, not legal-expert certification. |
 | 3 | **Indicative Regulatory Pathway** | `app/pathway.py` | A deterministic, category × jurisdiction next-step checklist (which form, which authority) once an answer is produced. |
 | 4 | **TKDL / prior-art resemblance scoring** | `app/tkdl_similarity.py` | TF-IDF similarity against a curated set of well-known classical formulations — quantifies "how close is this to known traditional knowledge" instead of only pointing at TKDL. |
 | 5 | **IP Posture Summary PDF export** | `app/posture_pdf.py` → `POST /api/posture-pdf` | Turns one analysis into a downloadable, timestamped PDF, rendered from exactly what the UI already showed — nothing invented, nothing extra. |
@@ -128,6 +128,56 @@ capabilities worth calling out on their own:
   three corpus searches within deterministic jurisdiction/area boundaries.
   The answer remains corpus-grounded; if planning is disabled or fails, the
   deterministic retrieval path runs — see [§3.2](#32-research-planning-and-pipeline-dag-appdagpy).
+
+---
+
+## 2.1 Feasibility: what the prototype proves, and what it does not
+
+The submission is deliberately evaluated as a **citation-grounded India /
+International analysis slice**, not as a production legal service. Its
+minimum working path is:
+
+1. The user selects one jurisdiction and asks one product/IP question.
+2. The deterministic classifier and jurisdiction filter route the question
+   against the local, version-tracked corpus.
+3. The app returns retrieved sources, a grounded answer or safe
+   clarification/abstention, and the standing information-not-legal-advice
+   notice.
+4. The live benchmark checks labeled examples and hard jurisdiction and
+   citation-integrity invariants.
+
+That path runs locally without paid API keys, a hosted database, Neo4j, or a
+generative model. BGE embeddings, external translation/voice providers,
+Groq, Neo4j, and registry connectors are optional integrations; the core
+analysis has deterministic/local fallbacks. The prototype corpus and
+rule-based classifier are bounded demonstration components, not complete
+legal coverage or a substitute for expert review.
+
+The classifier reports **intent/domain** separately from
+**product_classification**. Legal questions such as patentability, ABS, and
+trade secrets can be routed to jurisdiction-filtered sources without
+forcing a product category; the legacy `classification.category` field
+remains available and returns `Unknown / Not Required` in that case.
+Classification clarification is requested when product category is needed
+(for example, a genuinely ambiguous product/regulatory-route question) or
+when the query is out of scope.
+
+`GET /api/health` retains its existing fields and also reports integration
+modes: local core analysis is live; optional providers are marked configured
+or fallback; TKDL and the static graph are clearly marked reference-only;
+and Indian registry deep links are not represented as live database
+searches. Provider credentials are never returned.
+
+| Delivery stage | Feasible acceptance boundary |
+|---|---|
+| **Prototype (this submission)** | Demonstrate classification, jurisdiction-isolated retrieval, citations, safe clarification/abstention, and a repeatable labeled benchmark on the curated corpus. |
+| **Controlled pilot (next)** | Have an IP/regulatory reviewer validate priority corpus entries and benchmark labels; measure multilingual answer quality with native speakers; test with a small group of AYUSH users. |
+| **Production readiness (later)** | Complete legal/privacy/security review, establish corpus update ownership and change approval, and integrate only registries/providers with verified access and operational support. |
+
+Accounts, voice, external-source connectors, graph views, and other workspace
+tools are prototype extensions; they are **not prerequisites** for the
+minimum viable demonstration or assumed production commitments. The real
+TKDL remains access-restricted, and the app does not claim a live TKDL search.
 
 ---
 
@@ -345,7 +395,7 @@ flowchart TD
 
 ## 4. Quick start
 
-### Backend
+### Backend (macOS/Linux)
 
 ```bash
 cd backend
@@ -363,6 +413,39 @@ template-assembled answer is returned as-is (`llm_paraphrased: false`). Set
 paraphrase pass. For live translation and voice beyond the offline
 fallbacks, optionally set `BHASHINI_NMT_USER_ID` / `BHASHINI_NMT_API_KEY`
 (or `BHASHINI_USER_ID` / `BHASHINI_API_KEY`) and/or `SARVAM_API_KEY`.
+
+### Backend (Windows PowerShell)
+
+Python 3.11.11 is pinned in `backend/.python-version`. From the project root,
+these commands avoid shell activation and use the local TF-IDF path so the
+first analysis does not need to download an embedding model:
+
+```powershell
+Set-Location backend
+py -3.11 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+$env:SUTRADHARA_DISABLE_EMBEDDINGS = "1"
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --port 8000
+```
+
+In a second terminal, run `Set-Location frontend`, `npm.cmd ci`, then
+`npm.cmd run dev`. Open `http://127.0.0.1:5173`; Vite proxies API requests
+to the backend. The same backend can use BGE embeddings when available by
+omitting `SUTRADHARA_DISABLE_EMBEDDINGS`.
+
+### Verify the core slice
+
+With the backend running, open `http://127.0.0.1:8000/api/health` and confirm
+`status` is `ok`. Run the labeled benchmark from `backend`:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest tests\test_eval_benchmark.py -q
+```
+
+The benchmark exercises the app's analysis route against the labeled
+dataset. In its report, `jurisdiction_isolation_violations` and
+`citation_integrity_violations` are safety invariants and must both be zero;
+the accuracy metrics are prototype signals, not proof of legal correctness.
 
 ### Frontend
 

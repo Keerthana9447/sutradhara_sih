@@ -109,12 +109,14 @@ def lookup_patentsview(keyword: str, api_key: str, limit: int = 5,
     non-live results; no placeholder record is substituted.
     """
     if not api_key:
-        return {"live": False, "reason": "PatentsView API key is not configured.", "results": []}
+        return {"live": False, "mode": "FALLBACK", "simulated": False,
+                "reason": "PatentsView API key is not configured.", "results": []}
 
     try:
         import requests
     except ImportError:
-        return {"live": False, "reason": "'requests' package not installed.", "results": []}
+        return {"live": False, "mode": "FALLBACK", "simulated": False,
+                "reason": "'requests' package not installed.", "results": []}
 
     query = {"_text_any": {"patent_title": keyword}}
     fields = ["patent_id", "patent_title", "patent_date"]
@@ -133,6 +135,8 @@ def lookup_patentsview(keyword: str, api_key: str, limit: int = 5,
         patents = data.get("patents", []) or []
         return {
             "live": True,
+            "mode": "LIVE",
+            "simulated": False,
             "provider": "USPTO PatentsView Search API",
             "results": [
                 {
@@ -146,13 +150,17 @@ def lookup_patentsview(keyword: str, api_key: str, limit: int = 5,
         }
     except Exception as e:  # noqa: BLE001 — fails closed, see module docstring
         logger.warning("PatentsView lookup failed: %s", type(e).__name__)
-        return {"live": False, "reason": f"PatentsView request failed: {type(e).__name__}.", "results": []}
+        return {
+            "live": False, "mode": "FALLBACK", "simulated": False,
+            "reason": f"PatentsView request failed: {type(e).__name__}.", "results": [],
+        }
 
 
 def _lookup_international(keyword: str, limit: int = 5, timeout: float = 8.0) -> Dict[str, Any]:
     api_key = os.getenv("PATENTSVIEW_API_KEY")
     if not api_key:
-        return {"live": False, "reason": "PATENTSVIEW_API_KEY not configured.", "results": []}
+        return {"live": False, "mode": "FALLBACK", "simulated": False,
+                "reason": "PATENTSVIEW_API_KEY not configured.", "results": []}
     return lookup_patentsview(keyword, api_key, limit, timeout)
 
 
@@ -165,7 +173,10 @@ def _lookup_india(registry: str, keyword: str) -> Dict[str, Any]:
     entry = _INDIA_REGISTRIES.get(registry)
     if not entry:
         valid = ", ".join(_INDIA_REGISTRIES)
-        return {"live": False, "reason": f"Unknown India registry '{registry}'. Valid: {valid}.", "deep_link": None}
+        return {
+            "live": False, "mode": "FALLBACK", "simulated": False,
+            "reason": f"Unknown India registry '{registry}'. Valid: {valid}.", "deep_link": None,
+        }
 
     # GI is the one India registry with a real, periodically-refreshed data
     # cache behind it (see gi_registry.py) — try that first, and fall back
@@ -208,6 +219,8 @@ def _lookup_india(registry: str, keyword: str) -> Dict[str, Any]:
 
     return {
         "live": False,
+        "mode": "REFERENCE",
+        "simulated": False,
         "provider": entry["label"],
         "deep_link": url,
         "note": note,

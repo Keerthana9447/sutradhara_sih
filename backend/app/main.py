@@ -70,6 +70,13 @@ app.add_middleware(
 @app.get("/api/health")
 def health():
     freshness = corpus_freshness.freshness_report()
+    bhashini_nmt = translate.bhashini_status()
+    sarvam_nmt = translate.sarvam_translate_status()
+    bhashini_asr = asr.bhashini_asr_status()
+    sarvam_voice = asr.asr_status()
+    bhashini_tts = asr.bhashini_tts_status()
+    patentsview = registry_lookup.patentsview_status()
+    gi_status = gi_registry.status()
     return {
         "status": "ok",
         "corpus_documents": len(retrieval._CORPUS),
@@ -77,12 +84,72 @@ def health():
         "retrieval_backend": retrieval.BACKEND,
         "dag_backend": dag.DAG_BACKEND,
         "graph_backend": graph_store.GRAPH_BACKEND,
-        "sarvam_translate": translate.sarvam_translate_status(),
-        "bhashini": translate.bhashini_status(),
-        "sarvam_voice": asr.asr_status(),
-        "bhashini_voice": asr.bhashini_asr_status(),
-        "bhashini_tts": asr.bhashini_tts_status(),
-        "patentsview": registry_lookup.patentsview_status(),
+        "sarvam_translate": sarvam_nmt,
+        "bhashini": bhashini_nmt,
+        "sarvam_voice": sarvam_voice,
+        "bhashini_voice": bhashini_asr,
+        "bhashini_tts": bhashini_tts,
+        "patentsview": patentsview,
+        "integrations": {
+            "core_analysis": {
+                "mode": "LIVE",
+                "detail": "Local deterministic classification, retrieval, citation assembly, and abstention.",
+            },
+            "retrieval": {
+                "mode": "LIVE" if retrieval.BACKEND == "bge-fastembed+tfidf" else "FALLBACK",
+                "backend": retrieval.BACKEND,
+            },
+            "translation": {
+                "mode": "CONFIGURED" if (
+                    bhashini_nmt.get("configured") or sarvam_nmt.get("configured")
+                ) else "FALLBACK",
+                "bhashini_configured": bool(bhashini_nmt.get("configured")),
+                "sarvam_configured": bool(sarvam_nmt.get("configured")),
+                "offline_fallback": "English display plus local query normalization; quality is limited.",
+            },
+            "asr": {
+                "mode": "CONFIGURED" if (
+                    bhashini_asr.get("configured") or sarvam_voice.get("configured")
+                ) else "FALLBACK",
+                "bhashini_configured": bool(bhashini_asr.get("configured")),
+                "sarvam_configured": bool(sarvam_voice.get("configured")),
+                "supported_languages": list(asr.SUPPORTED_ASR_LANGUAGES),
+            },
+            "tts": {
+                "mode": "CONFIGURED" if (
+                    bhashini_tts.get("configured") or sarvam_voice.get("configured")
+                ) else "FALLBACK",
+                "bhashini_configured": bool(bhashini_tts.get("configured")),
+                "sarvam_configured": bool(sarvam_voice.get("configured")),
+                "supported_languages": ["en", "hi", "te", "ta", "ml", "sa"],
+                "sanskrit_note": "Provider voices may use a Hindi approximation; verify provider coverage.",
+            },
+            "tkdl": {
+                "mode": "REFERENCE_ONLY",
+                "connected": False,
+                "detail": "The real TKDL is access-restricted and is not queried by this prototype.",
+            },
+            "india_patent_trademark_registry": {
+                "mode": "FALLBACK",
+                "live_search": False,
+                "detail": "Public official portal deep links only; no structured search API is connected.",
+            },
+            "gi_registry": {
+                "mode": "LIVE_CACHE" if gi_status.get("built") else "FALLBACK",
+                "cache_built": bool(gi_status.get("built")),
+                "entry_count": gi_status.get("entry_count", 0),
+            },
+            "patentsview": {
+                "mode": "LIVE_CONFIGURED" if patentsview.get("configured") else "FALLBACK",
+                "configured": bool(patentsview.get("configured")),
+                "detail": "Configured status only; actual live queries remain explicitly opt-in.",
+            },
+            "graph": {
+                "mode": "LIVE" if graph_store.GRAPH_BACKEND == "neo4j" else "REFERENCE",
+                "backend": graph_store.GRAPH_BACKEND,
+                "detail": "The /api/graph endpoint is a static schema view; query reasoning uses Neo4j only when available.",
+            },
+        },
     }
 
 
@@ -136,6 +203,8 @@ def get_source(doc_id: str):
 def get_graph():
     """Static explainability graph for the prototype UI (mirrors graph/schema.cypher)."""
     return {
+        "mode": "REFERENCE",
+        "live_government_data": False,
         "nodes": [
             {"id": "product", "label": "Ayurvedic Product", "type": "Product"},
             {"id": "category", "label": "Product Category", "type": "ProductCategory"},
@@ -153,7 +222,7 @@ def get_graph():
             {"from": "law", "to": "provision", "label": "contains", "confidence": 1.0, "provenance": {"basis": "static_schema", "reference": "graph/schema.cypher"}},
             {"from": "provision", "to": "source", "label": "supported_by", "confidence": 1.0, "provenance": {"basis": "static_schema", "reference": "graph/schema.cypher"}},
         ],
-        "note": "Static schema view for the prototype. See graph/schema.cypher for the live Neo4j model.",
+        "note": "Static schema/reference view, not live government data. Query reasoning uses Neo4j only when available.",
     }
 
 

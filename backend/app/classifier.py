@@ -1,14 +1,14 @@
 """
-Product classification logic.
+Deterministic two-stage query understanding.
 
-Deliberately rule-based (keyword + pattern matching) rather than an LLM call:
-classification is a factual routing decision that downstream retrieval and
-jurisdiction logic depend on, so it needs to be deterministic, auditable, and
-explainable to a judge. An LLM can be layered on top later (Phase-9+) without
-changing this interface.
+Legal intent selects retrieval domains; product classification is inferred
+separately and only requested when it is needed to answer a product-category
+question. This keeps words such as "proprietary" from turning a trade-secret
+or patent question into a medicine classification.
 """
-from typing import Optional
 import re
+from typing import Optional
+
 from .schemas import ClassificationResult
 
 CATEGORIES = [
@@ -20,147 +20,263 @@ CATEGORIES = [
     "Cosmetic",
 ]
 
-_KEYWORDS = {
-    "Classical / Generic Medicine": [
-        "classical", "traditional formulation", "authoritative text", "ancient text", "formulary",
-        "charaka", "sushruta", "ashtanga", "shastra", "classical text",
-        "traditional ayurvedic", "known formulation", "triphala",
-        "geographical indication", "regional name", "traditionally made",
-        "national biodiversity authority",
-    ],
-    "Patent / Proprietary Medicine": [
-        "proprietary", "patent medicine", "brand", "my own formula", "own formulation",
-        "proprietary ayurvedic",
-    ],
-    "New / Non-Classical Drug": [
-        "new formulation", "not found in classical", "novel formulation", "not in any classical text",
-        "developed a new", "innovation", "new drug", "not documented", "not a classical",
-    ],
-    "Phytopharmaceutical": [
-        "phytopharmaceutical", "standardized extract", "purified extract", "botanical drug",
-        "isolated compound", "phyto",
-    ],
-    "Ayurveda-Aahar / Nutraceutical": [
-        "nutraceutical", "health supplement", "aahar", "food supplement", "functional food",
-        "dietary supplement",
-    ],
-    "Cosmetic": [
-        "cosmetic", "skincare", "cream for skin", "soap", "beauty product", "hair oil",
-        "face pack",
-    ],
+UNKNOWN_CATEGORY = "Unknown / Not Required"
+
+INTENTS = [
+    "Patent / Patentability",
+    "Traditional Knowledge",
+    "Access and Benefit Sharing",
+    "Trade Secrets / Confidential Information",
+    "Geographical Indications",
+    "Trademarks",
+    "Copyright",
+    "Designs",
+    "Plant Variety Protection",
+    "Drug Regulation",
+    "Food / Nutraceutical",
+    "Cosmetic",
+    "General IP / Regulatory Guidance",
+    "Out of Scope",
+]
+
+_INTENT_TERMS = [
+    ("Access and Benefit Sharing", (
+        "access and benefit sharing", "access and benefit-sharing", "benefit sharing",
+        "benefit-sharing", "biodiversity",
+        "biological resource", "biological resources", "genetic resource",
+        "genetic resources", "national biodiversity authority",
+        "nba approval", "nagoya", "abs obligation", "abs approval",
+    )),
+    ("Trade Secrets / Confidential Information", (
+        "trade secret", "confidential", "non-disclosure", "nondisclosure",
+        "breach of confidence", "undisclosed information", "nda",
+    )),
+    ("Patent / Patentability", (
+        "patent", "patentability", "patentable", "invention", "inventive step",
+        "novelty", "pct application", "patents act",
+    )),
+    ("Traditional Knowledge", (
+        "traditional knowledge", "classical text", "traditional text", "tkdl",
+        "prior art", "traditional formulation", "gratk",
+    )),
+    ("Plant Variety Protection", (
+        "plant variety", "plant-variety", "seed variety", "cultivar",
+        "breeders right", "breeder's right", "upov",
+    )),
+    ("Geographical Indications", (
+        "geographical indication", "geographical indications", "gi registration",
+        "gi tag", "regional indication",
+    )),
+    ("Trademarks", (
+        "trademark", "trade mark", "brand name", "logo registration",
+        "madrid protocol",
+    )),
+    ("Copyright", (
+        "copyright", "literary work", "artistic work", "berne convention",
+    )),
+    ("Designs", (
+        "industrial design", "design registration", "product shape", "hague agreement",
+    )),
+    ("Food / Nutraceutical", (
+        "nutraceutical", "health supplement", "food supplement", "functional food",
+        "dietary supplement", "ayurveda aahar", "ayurveda-aahar", "fssai",
+        "dshea", "new dietary ingredient",
+    )),
+    ("Cosmetic", (
+        "cosmetic", "skincare", "skin care", "beauty product", "cosmetic claim",
+    )),
+    ("Drug Regulation", (
+        "drug regulation", "drug licence", "drug license", "manufacturing licence",
+        "manufacturing license", "drug approval", "drug registration", "clinical",
+        "herbal medicinal product", "traditional herbal registration", "thmpd",
+        "mhra", "natural health product", "marketing authorisation",
+        "marketing authorization", "regulatory requirement", "regulatory pathway",
+        "phytopharmaceutical",
+    )),
+]
+
+_CATEGORY_TERMS = {
+    "Classical / Generic Medicine": (
+        "classical ayurvedic formulation", "classical formulation",
+        "classical ayurvedic medicine", "classical medicine",
+        "classical ayurvedic herbal tablet", "classical herbal tablet",
+        "classical ayurvedic herbal medicine", "classical herbal medicine",
+        "traditional ayurvedic formulation", "traditional ayurvedic medicine",
+        "described in a classical text", "described in the ayurvedic formulary",
+        "formulation described in", "already described in a traditional text",
+        "known classical formulation",
+    ),
+    "Patent / Proprietary Medicine": (
+        "patent/proprietary medicine", "patent or proprietary medicine",
+        "patent and proprietary medicine", "proprietary ayurvedic medicine",
+        "proprietary medicine",
+    ),
+    "New / Non-Classical Drug": (
+        "new ayurvedic formulation", "new formulation", "novel formulation",
+        "new non-classical drug", "new drug", "not documented in a classical",
+        "not found in a classical", "not found in any classical",
+        "not described in a classical", "not a classical formulation",
+    ),
+    "Phytopharmaceutical": (
+        "phytopharmaceutical", "standardized extract", "standardised extract",
+        "purified botanical extract", "botanical drug", "isolated compound",
+    ),
+    "Ayurveda-Aahar / Nutraceutical": (
+        "nutraceutical", "health supplement", "food supplement", "functional food",
+        "dietary supplement", "ayurveda aahar", "ayurveda-aahar", "food product",
+    ),
+    "Cosmetic": (
+        "cosmetic product", "herbal cosmetic", "skincare product", "skin care product",
+        "face cream", "face pack", "skin brightening", "skin whitening",
+        "beauty product", "hair oil", "soap",
+    ),
 }
 
-
-_NEW_FORMULATION_PATTERNS = [
-    # Naive substring keyword-counting (below) has no negation awareness:
-    # "...not found in a classical text" contains both "classical" and
-    # "classical text" as bare substrings, so it was outscoring the correct
-    # "New / Non-Classical Drug" category, which only matched "developed a
-    # new" once — exactly the brief's own Demo Scenario 2 query. These
-    # patterns catch the negated phrasing explicitly and win first, before
-    # the keyword-count competition ever runs.
+_OUT_OF_SCOPE_TERMS = ("quantum computing", "boiling point of tungsten")
+_AYURVEDA_CONTEXT = (
+    "ayurved", "herbal", "medicinal plant", "formulation", "medicine", "drug",
+    "biological resource", "genetic resource", "traditional knowledge",
+)
+_CLASSIFICATION_QUESTION = re.compile(
+    r"\b(what category|which category|classify|classification|is this a|"
+    r"what type of (?:medicine|drug|product)|which licence|which license|"
+    r"what licence|what license|what approval route|which approval route)\b"
+)
+_VAGUE_PRODUCT_QUESTION = re.compile(
+    r"\b(tell me about|advise me about|help me with)\b.*\b(product|formulation|medicine)\b",
+    re.IGNORECASE,
+)
+_NEW_FORMULATION_PATTERNS = (
     re.compile(r"not\s+(found|documented|described|present)\s+in\s+(any\s+|a\s+)?classical"),
     re.compile(r"not\s+in\s+any\s+classical"),
     re.compile(r"non[\s-]?classical"),
     re.compile(r"not\s+a\s+classical"),
-]
+)
+
+
+def detect_intent(query: str) -> str:
+    """Return one deterministic legal-domain label or ``Out of Scope``."""
+    q = (query or "").lower()
+    if any(term in q for term in _OUT_OF_SCOPE_TERMS):
+        return "Out of Scope"
+    if (
+        "ip and regulatory" in q
+        or "intellectual property and regulatory" in q
+        or "ip/regulatory considerations" in q
+    ) and not any(
+        _contains_term(q, term)
+        for intent, terms in _INTENT_TERMS
+        if intent not in {"Traditional Knowledge", "Drug Regulation"}
+        for term in terms
+    ):
+        return "General IP / Regulatory Guidance"
+
+    for intent, terms in _INTENT_TERMS:
+        if any(_contains_term(q, term) for term in terms):
+            return intent
+
+    if any(term in q for term in _AYURVEDA_CONTEXT):
+        return "General IP / Regulatory Guidance"
+    return "Out of Scope"
+
+
+def _contains_term(text: str, term: str) -> bool:
+    return re.search(r"(?<!\w)" + re.escape(term) + r"(?!\w)", text) is not None
+
+
+def _product_category(query: str) -> Optional[str]:
+    q = query.lower()
+    if any(pattern.search(q) for pattern in _NEW_FORMULATION_PATTERNS):
+        return "New / Non-Classical Drug"
+
+    matched = [
+        category
+        for category, terms in _CATEGORY_TERMS.items()
+        if any(_contains_term(q, term) for term in terms)
+    ]
+    if (
+        "classical" in q
+        and ("ayurveda" in q or "ayurvedic" in q)
+        and "formulation" in q
+    ):
+        matched.append("Classical / Generic Medicine")
+    if not matched:
+        return None
+
+    # Prefer the most specific identified product type when a query compares
+    # alternatives (e.g. "cosmetic or drug") or mentions a subcategory.
+    priority = {
+        "New / Non-Classical Drug": 0,
+        "Phytopharmaceutical": 1,
+        "Ayurveda-Aahar / Nutraceutical": 2,
+        "Cosmetic": 3,
+        "Patent / Proprietary Medicine": 4,
+        "Classical / Generic Medicine": 5,
+    }
+    return min(matched, key=priority.__getitem__)
 
 
 def classify(query: str, confirmed_category: Optional[str] = None) -> ClassificationResult:
-    if confirmed_category and confirmed_category in CATEGORIES:
+    intent = detect_intent(query)
+    category = (
+        confirmed_category
+        if confirmed_category in CATEGORIES
+        else _product_category(query)
+    )
+    if category:
+        reason = (
+            "Product category confirmed directly by the user."
+            if confirmed_category in CATEGORIES
+            else f"The query explicitly describes a {category} product/formulation."
+        )
         return ClassificationResult(
-            category=confirmed_category,
-            confidence=0.99,
-            reason="Category confirmed directly by the user.",
+            category=category,
+            product_classification=category,
+            intent=intent,
+            intent_confidence=0.9 if intent != "Out of Scope" else 0.35,
+            classification_required=True,
+            confidence=0.99 if confirmed_category in CATEGORIES else 0.85,
+            reason=reason,
             needs_clarification=False,
         )
 
-    q = query.lower()
-
-    if any(p.search(q) for p in _NEW_FORMULATION_PATTERNS):
-        return ClassificationResult(
-            category="New / Non-Classical Drug",
-            confidence=0.85,
-            reason=(
-                "The query explicitly states the formulation is NOT found in any "
-                "classical text, which is treated as a new/non-classical drug for "
-                "regulatory purposes."
-            ),
-            needs_clarification=False,
+    # Legal intent is enough to route a legal-information query. Do not force
+    # a medicine category merely because a law or commercial term was named.
+    if intent != "Out of Scope":
+        needs_category = bool(
+            _CLASSIFICATION_QUESTION.search(query or "")
+            or _VAGUE_PRODUCT_QUESTION.search(query or "")
         )
-
-    if any(term in q for term in ("functional food", "daily wellness", "food product")):
+        question = None
+        if needs_category:
+            question = (
+                "Is the product a classical formulation from a First-Schedule "
+                "authoritative text, a new/non-classical medicine, a proprietary "
+                "medicine, a phytopharmaceutical, an Ayurveda-Aahar/food product, "
+                "or a cosmetic?"
+            )
         return ClassificationResult(
-            category="Ayurveda-Aahar / Nutraceutical",
-            confidence=0.85,
-            reason="The query describes a food or daily-wellness product rather than a medicinal formulation.",
-            needs_clarification=False,
+            category=UNKNOWN_CATEGORY,
+            product_classification=UNKNOWN_CATEGORY,
+            intent=intent,
+            intent_confidence=0.8,
+            classification_required=needs_category,
+            confidence=0.8,
+            reason="The query has a legal/regulatory intent, but does not establish a product category.",
+            needs_clarification=needs_category,
+            clarification_question=question,
         )
-
-    if any(term in q for term in ("face pack", "skin brightening", "no therapeutic claim")):
-        return ClassificationResult(
-            category="Cosmetic",
-            confidence=0.85,
-            reason="The query describes a topical product for cosmetic use without a therapeutic claim.",
-            needs_clarification=False,
-        )
-
-    scores = {cat: 0 for cat in CATEGORIES}
-    for cat, kws in _KEYWORDS.items():
-        for kw in kws:
-            if kw in q:
-                scores[cat] += 1
-
-    best_cat = max(scores, key=scores.get)
-    best_score = scores[best_cat]
-    total_hits = sum(scores.values())
-
-    if best_score == 0:
-        # No strong signal — ask the minimum necessary clarification question
-        # rather than guessing.
-        return ClassificationResult(
-            category="Classical / Generic Medicine",
-            confidence=0.35,
-            reason="No explicit signal found in the query for a specific category.",
-            needs_clarification=True,
-            clarification_question=(
-                "Is this formulation described in a classical/authoritative Ayurvedic "
-                "text, or is it a new formulation you have developed that is not found "
-                "in a classical text?"
-            ),
-        )
-
-    confidence = min(0.95, 0.5 + 0.15 * best_score - 0.05 * (total_hits - best_score))
-    confidence = max(0.4, confidence)
-
-    reason_map = {
-        "Classical / Generic Medicine": (
-            "The query indicates the formulation is associated with an authoritative "
-            "classical source or traditional knowledge."
-        ),
-        "Patent / Proprietary Medicine": (
-            "The query indicates a proprietary formulation intended for branded manufacture "
-            "under the Patent/Proprietary Ayurvedic medicine regime."
-        ),
-        "New / Non-Classical Drug": (
-            "The query indicates a formulation that is not documented in any classical text, "
-            "which is treated as a new/non-classical drug for regulatory purposes."
-        ),
-        "Phytopharmaceutical": (
-            "The query describes a standardized or purified botanical extract, which falls "
-            "under the phytopharmaceutical category."
-        ),
-        "Ayurveda-Aahar / Nutraceutical": (
-            "The query describes a food/health-supplement style product rather than a drug."
-        ),
-        "Cosmetic": (
-            "The query describes a topical/cosmetic-use product rather than an internal medicine."
-        ),
-    }
 
     return ClassificationResult(
-        category=best_cat,
-        confidence=round(confidence, 2),
-        reason=reason_map[best_cat],
-        needs_clarification=False,
+        category=UNKNOWN_CATEGORY,
+        product_classification=UNKNOWN_CATEGORY,
+        intent=intent,
+        intent_confidence=0.95,
+        classification_required=True,
+        confidence=0.35,
+        reason="No in-scope IP, regulatory, or product-category signal was found.",
+        needs_clarification=True,
+        clarification_question=(
+            "What Ayurvedic product or IP/regulatory issue would you like help with?"
+        ),
     )

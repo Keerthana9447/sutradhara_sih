@@ -18,10 +18,18 @@ def build_answer(query: str, category: str, jurisdiction: str, sources: List[Dic
     if not sources:
         return ""
 
-    lines = [
-        f"For a product classified as '{category}' under {jurisdiction} jurisdiction, "
-        f"the following authoritative considerations apply based on the retrieved sources:"
-    ]
+    if category == "Unknown / Not Required":
+        opening = (
+            f"Product classification is not required for this legal-domain question under "
+            f"{jurisdiction} jurisdiction. The following considerations are based only on "
+            "the retrieved authoritative sources:"
+        )
+    else:
+        opening = (
+            f"For a product classified as '{category}' under {jurisdiction} jurisdiction, "
+            "the following authoritative considerations apply based on the retrieved sources:"
+        )
+    lines = [opening]
     for i, s in enumerate(sources, 1):
         lines.append(f"({i}) {s['summary']} [Source: {s['title']}, {s['section']}]")
 

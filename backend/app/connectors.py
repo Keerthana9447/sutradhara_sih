@@ -177,6 +177,7 @@ def use_connector(connector_id: str, query: str) -> Optional[Dict[str, Any]]:
             return {
                 "connector_id": connector_id,
                 "provider": connector["provider"],
+                "mode": "FALLBACK",
                 "live": False,
                 "simulated": False,
                 "reason": "This connector has no encrypted API key. Re-link it to enable live search.",
@@ -194,6 +195,7 @@ def use_connector(connector_id: str, query: str) -> Optional[Dict[str, Any]]:
             return {
                 "connector_id": connector_id,
                 "provider": connector["provider"],
+                "mode": "FALLBACK",
                 "live": False,
                 "simulated": False,
                 "reason": reason,
@@ -204,6 +206,7 @@ def use_connector(connector_id: str, query: str) -> Optional[Dict[str, Any]]:
         return {
             "connector_id": connector_id,
             "provider": "USPTO PatentsView Search API",
+            "mode": "LIVE" if result["live"] else "FALLBACK",
             "jurisdiction": "United States",
             "scope": connector["scope"],
             "live": result["live"],
@@ -220,6 +223,7 @@ def use_connector(connector_id: str, query: str) -> Optional[Dict[str, Any]]:
         "connector_id": connector_id,
         "provider": connector["provider"],
         "scope": connector["scope"],
+        "mode": "SIMULATED",
         "live": False,
         "simulated": True,
         "note": (

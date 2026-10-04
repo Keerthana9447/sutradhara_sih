@@ -144,7 +144,20 @@ def classify_for_user(dossier_id: str, user_id: int,
             f"{dossier['name']}. Ingredients: {', '.join(ingredients)}. "
             f"Sourcing: {dossier['sourcing_type']}. Indication: {dossier['indication']}."
         )
-        result = classifier.classify(query, confirmed_category).model_dump()
+        classification = classifier.classify(query, confirmed_category)
+        if (
+            confirmed_category is None
+            and classification.product_classification == "Unknown / Not Required"
+        ):
+            # A saved formulation dossier cannot progress to evidence mapping
+            # without a product category, even when a standalone legal query
+            # would not require one.
+            classification.classification_required = True
+            classification.needs_clarification = True
+            classification.clarification_question = (
+                "Select the product category for this dossier before mapping evidence."
+            )
+        result = classification.model_dump()
         now = datetime.datetime.utcnow().isoformat()
         next_status = "classified" if not result["needs_clarification"] else "draft"
         conn.execute(
@@ -182,7 +195,9 @@ def map_for_user(dossier_id: str, user_id: int) -> Optional[Dict[str, Any]]:
             f"{dossier['name']}. Ingredients: {', '.join(ingredients)}. "
             f"Sourcing: {dossier['sourcing_type']}. Indication: {dossier['indication']}."
         )
-        areas = jurisdiction.route_areas(query, classification["category"])
+        areas = jurisdiction.route_areas(
+            query, classification["category"], classification.get("intent", "")
+        )
         markets = ("India", "International") if dossier["target_market"] == "Both" else (dossier["target_market"],)
         mappings = {}
         for market in markets:

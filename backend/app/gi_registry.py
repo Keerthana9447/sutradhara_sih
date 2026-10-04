@@ -257,7 +257,13 @@ def search(keyword: str, limit: int = 5) -> Dict[str, Any]:
 
     meta = status()
     if not meta["built"]:
-        return {"live": False, "reason": "GI registry cache has not been built yet.", "results": []}
+        return {
+            "live": False,
+            "mode": "FALLBACK",
+            "simulated": False,
+            "reason": "GI registry cache has not been built yet.",
+            "results": [],
+        }
 
     like = f"%{keyword.strip()}%"
     conn = db.get_conn()
@@ -270,6 +276,8 @@ def search(keyword: str, limit: int = 5) -> Dict[str, Any]:
 
     return {
         "live": True,
+        "mode": "LIVE_CACHE",
+        "simulated": False,
         "provider": "IP India — Registered GI list (periodically refreshed from the official published PDF)",
         "source_pdf_url": meta["source_pdf_url"],
         "cached_as_of": meta["built_at"],

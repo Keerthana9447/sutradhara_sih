@@ -82,7 +82,7 @@ function RadarPanel() {
               </span>
             </div>
             <p className="text-sm text-ink/70">{result.ministry_action_summary}</p>
-            <p className="text-xs text-ink/40 mt-2">{result.total_matches} TKDL matches • {result.high_risk_matches} high risk • {result.medium_risk_matches} medium risk</p>
+            <p className="text-xs text-ink/40 mt-2">{result.total_matches} illustrative reference matches • {result.high_risk_matches} high risk • {result.medium_risk_matches} medium risk</p>
           </div>
           {result.matches.map((m, i) => (
             <div key={i} className="border border-hairline rounded-md p-3.5 bg-paper/60">

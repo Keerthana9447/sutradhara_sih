@@ -24,6 +24,13 @@ class ClassificationResult(BaseModel):
     reason: str
     needs_clarification: bool = False
     clarification_question: Optional[str] = None
+    # `category` remains the backward-compatible field consumed by the
+    # existing UI and routing pipeline. These fields make the two decisions
+    # explicit for newer clients and evaluations.
+    product_classification: str = "Unknown / Not Required"
+    intent: str = "General IP / Regulatory Guidance"
+    intent_confidence: float = 0.0
+    classification_required: bool = False
 
 
 class SourceRef(BaseModel):

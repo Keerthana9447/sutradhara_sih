@@ -51,3 +51,15 @@ def test_citation_hit_rate_above_threshold():
     report = eval_runner.run_benchmark(app)
     assert report["citation_hit_rate"] is not None
     assert report["citation_hit_rate"] >= _MIN_ACCEPTABLE_ACCURACY
+
+
+def test_grounded_answer_metrics_meet_threshold_and_have_no_unsupported_answers():
+    report = eval_runner.run_benchmark(app)
+    assert report["intent_accuracy"] >= _MIN_ACCEPTABLE_ACCURACY
+    assert report["jurisdiction_accuracy"] == 1.0
+    assert report["product_classification_accuracy"] >= _MIN_ACCEPTABLE_ACCURACY
+    assert report["expected_citation_correctness"] >= _MIN_ACCEPTABLE_ACCURACY
+    assert report["answer_grounding_rate"] >= _MIN_ACCEPTABLE_ACCURACY
+    assert report["supported_claim_rate"] >= _MIN_ACCEPTABLE_ACCURACY
+    assert report["citation_support_rate"] >= _MIN_ACCEPTABLE_ACCURACY
+    assert report["unsupported_answer_rate"] == 0.0

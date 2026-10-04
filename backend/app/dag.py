@@ -153,7 +153,13 @@ def _clarification_response(state: AnalyzeState) -> Dict[str, Any]:
 
 
 def _route_areas(state: AnalyzeState) -> Dict[str, Any]:
-    return {"areas": jurisdiction.route_areas(state["retrieval_query"], state["classification"].category)}
+    return {
+        "areas": jurisdiction.route_areas(
+            state["retrieval_query"],
+            state["classification"].category,
+            state["classification"].intent,
+        )
+    }
 
 
 def _plan_research(state: AnalyzeState) -> Dict[str, Any]:
@@ -187,9 +193,20 @@ def _retrieve(state: AnalyzeState) -> Dict[str, Any]:
         return {"retrieved": [], "research_plan": []}
 
     top_k = {"quick": 3, "guided": 5, "deep": 10}.get(state.get("query_depth", "guided"), 5)
+    classification = state.get("classification")
+    strict_domains = (
+        set(state["areas"])
+        if classification and classification.category == "Unknown / Not Required"
+        else set()
+    )
     candidates = retrieval.retrieve(
         state["query_variants"], state["jur"], state["areas"], top_k=top_k,
     )
+    if strict_domains:
+        candidates = [
+            doc for doc in candidates
+            if doc.get("domain") in strict_domains
+        ]
     executed_plan: List[Dict[str, str]] = []
 
     def execute_steps(steps: List[Dict[str, str]]) -> None:
@@ -198,7 +215,9 @@ def _retrieve(state: AnalyzeState) -> Dict[str, Any]:
                 [step["query"]], state["jur"], [step["area"]], top_k=top_k,
             )
             candidates.extend(
-                doc for doc in step_results if doc.get("domain") == step["area"]
+                doc for doc in step_results
+                if doc.get("domain") == step["area"]
+                and (not strict_domains or doc.get("domain") in strict_domains)
             )
             executed_plan.append(step)
 
@@ -277,7 +296,19 @@ def _use_connector(state: AnalyzeState) -> Dict[str, Any]:
     # kept as a separately-tagged field.
     connector_source_used = None
     if state.get("use_connector_id"):
-        connector_source_used = connectors.use_connector(state["use_connector_id"], state["query"])
+        try:
+            connector_source_used = connectors.use_connector(
+                state["use_connector_id"], state["query"]
+            )
+        except Exception as exc:
+            logger.exception("Optional source connector failed; continuing core analysis")
+            connector_source_used = {
+                "mode": "FALLBACK",
+                "live": False,
+                "simulated": False,
+                "reason": f"Optional connector unavailable ({type(exc).__name__}); core corpus analysis continued.",
+                "results": [],
+            }
     return {"connector_source_used": connector_source_used}
 
 

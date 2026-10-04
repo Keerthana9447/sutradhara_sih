@@ -97,7 +97,9 @@ function wrapLabel(text, maxChars = 20, maxLines = 2) {
 }
 
 export default function KnowledgeGraphView({ copy, defaultCategory, defaultJurisdiction }) {
-  const [category, setCategory] = useState(defaultCategory || CATEGORIES[0])
+  const [category, setCategory] = useState(
+    CATEGORIES.includes(defaultCategory) ? defaultCategory : CATEGORIES[0],
+  )
   const [jurisdiction, setJurisdiction] = useState(defaultJurisdiction || 'India')
   const [exportIntent, setExportIntent] = useState(false)
   const [graph, setGraph] = useState(null)

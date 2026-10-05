@@ -45,6 +45,16 @@ from .schemas import (
 async def lifespan(_app):
     db.init_db()
     admin_auth.ensure_role_column()
+    # Pre-warm BGE embeddings at startup so the ONNX model is downloaded and
+    # corpus vectors are built during Render's boot phase, not on the first
+    # user request. Falls back to TF-IDF silently if fastembed is unavailable.
+    try:
+        import asyncio
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(None, retrieval._ensure_embeddings)
+        logger.info("Retrieval backend ready: %s", retrieval.BACKEND)
+    except Exception as exc:
+        logger.warning("BGE pre-warm failed at startup (TF-IDF fallback active): %s", exc)
     yield
 
 

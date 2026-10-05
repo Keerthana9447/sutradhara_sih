@@ -17,8 +17,6 @@ services:
         sync: false
       - key: ENABLE_LLM_PARAPHRASE
         value: "true"
-      - key: SUTRADHARA_DISABLE_EMBEDDINGS
-        value: "1"
       - key: GROQ_TIMEOUT_SECONDS
         value: "8"
       # A single Bhashini/ULCA account's credentials cover translation

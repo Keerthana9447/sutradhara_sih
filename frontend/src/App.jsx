@@ -485,7 +485,13 @@ export default function App() {
 
   // ── Auth gate ─────────────────────────────────────────────────────────
   if (!auth) {
-    if (authPage === 'admin') return <AdminSignIn onGoBack={() => setAuthPage('signin')} />
+    if (authPage === 'admin') return (
+      <AdminSignIn
+        language={lang}
+        onLanguageChange={setLang}
+        onGoBack={() => setAuthPage('signin')}
+      />
+    )
     return authPage === 'signin'
       ? <SignIn onGoSignUp={() => setAuthPage('signup')} onGoAdmin={() => setAuthPage('admin')} />
       : <SignUp onGoSignIn={() => setAuthPage('signin')} />
@@ -711,7 +717,12 @@ export default function App() {
             )}
 
             {tab === 'admin' && userRole === 'admin' && (
-              <AdminDashboard user={auth.user} />
+              <AdminDashboard
+                user={auth.user}
+                language={lang}
+                externalProcessingConsent={externalProcessingConsent}
+                onExternalProcessingConsentChange={setExternalProcessingConsent}
+              />
             )}
 
             {tab === 'analyze' && (

@@ -41,6 +41,13 @@ GRAPH_BACKEND = "in_memory"  # flipped to "neo4j" below iff driver+connection su
 _DRIVER = None
 
 
+def _neo4j_credentials():
+    uri = os.getenv("NEO4J_URI")
+    user = os.getenv("NEO4J_USERNAME") or os.getenv("NEO4J_USER")
+    password = os.getenv("NEO4J_PASSWORD")
+    return uri, user, password
+
+
 def _try_init_neo4j() -> bool:
     global _DRIVER, GRAPH_BACKEND
 
@@ -48,11 +55,9 @@ def _try_init_neo4j() -> bool:
         logger.info("Neo4j backend disabled by SUTRADHARA_DISABLE_NEO4J. Using in-memory graph traversal.")
         return False
 
-    uri = os.getenv("NEO4J_URI")
-    user = os.getenv("NEO4J_USER")
-    password = os.getenv("NEO4J_PASSWORD")
+    uri, user, password = _neo4j_credentials()
     if not (uri and user and password):
-        logger.info("NEO4J_URI/NEO4J_USER/NEO4J_PASSWORD not fully set. Using in-memory graph traversal.")
+        logger.info("NEO4J_URI/NEO4J_USERNAME/NEO4J_PASSWORD not fully set. Using in-memory graph traversal.")
         return False
 
     try:

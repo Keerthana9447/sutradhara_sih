@@ -21,6 +21,7 @@ export const COPY = {
     navEvidence: 'Evidence',
     navGraph: 'Knowledge Graph',
     navEval: 'Evaluation',
+    navAdmin: 'Admin',
 
     inputLabel: 'Describe your Ayurvedic product or IP question',
     placeholder: 'e.g. Can I patent a classical Ayurvedic formulation already described in a traditional text?',
@@ -122,6 +123,7 @@ export const COPY = {
     navEvidence: 'ఆధారాలు',
     navGraph: 'జ్ఞాన గ్రాఫ్',
     navEval: 'మూల్యాంకనం',
+    navAdmin: 'నిర్వాహకుడు',
 
     inputLabel: 'మీ ఆయుర్వేద ఉత్పత్తి లేదా IP ప్రశ్నను వివరించండి',
     placeholder: 'ఉదా. సాంప్రదాయ గ్రంథంలో వివరించిన శాస్త్రీయ ఆయుర్వేద సూత్రీకరణకు నేను పేటెంట్ పొందవచ్చా?',
@@ -221,6 +223,7 @@ export const COPY = {
     navEvidence: 'प्रमाण',
     navGraph: 'ज्ञान ग्राफ',
     navEval: 'मूल्यांकन',
+    navAdmin: 'व्यवस्थापक',
 
     inputLabel: 'अपने आयुर्वेदिक उत्पाद या IP प्रश्न का वर्णन करें',
     placeholder: 'उदा. क्या पारंपरिक ग्रंथ में वर्णित शास्त्रीय आयुर्वेदिक फॉर्मूलेशन का पेटेंट लिया जा सकता है?',
@@ -320,6 +323,7 @@ export const COPY = {
     navEvidence: 'ஆதாரங்கள்',
     navGraph: 'அறிவு வரைபடம்',
     navEval: 'மதிப்பீடு',
+    navAdmin: 'நிர்வாகம்',
 
     inputLabel: 'உங்கள் ஆயுர்வேத தயாரிப்பு அல்லது IP கேள்வியை விவரிக்கவும்',
     placeholder: 'எ.கா. பாரம்பரிய நூலில் ஏற்கனவே விவரிக்கப்பட்ட ஒரு பாரம்பரிய ஆயுர்வேத சூத்திரமாக்கத்திற்கு நான் காப்புரிமை பெற முடியுமா?',
@@ -419,6 +423,7 @@ export const COPY = {
     navEvidence: 'തെളിവുകൾ',
     navGraph: 'അറിവ് ഗ്രാഫ്',
     navEval: 'മൂല്യനിർണ്ണയം',
+    navAdmin: 'അഡ്മിൻ',
 
     inputLabel: 'നിങ്ങളുടെ ആയുർവേദ ഉൽപ്പന്നമോ IP ചോദ്യമോ വിവരിക്കുക',
     placeholder: 'ഉദാ. ഒരു പരമ്പരാഗത ഗ്രന്ഥത്തിൽ ഇതിനകം വിവരിച്ചിട്ടുള്ള ഒരു ക്ലാസിക്കൽ ആയുർവേദ ഫോർമുലേഷന് എനിക്ക് പേറ്റന്റ് നേടാൻ കഴിയുമോ?',
@@ -518,6 +523,7 @@ export const COPY = {
     navEvidence: 'प्रमाणानि',
     navGraph: 'ज्ञान-आरेखः',
     navEval: 'मूल्यांकनम्',
+    navAdmin: 'प्रशासकः',
 
     inputLabel: 'भवतः आयुर्वेद-उत्पादं बौद्धिकसम्पत्ति-प्रश्नं वा वर्णयतु',
     placeholder: 'यथा, परम्परा-ग्रन्थे वर्णितस्य शास्त्रीय-आयुर्वेद-सूत्रीकरणस्य पेटेण्ट् प्राप्तुं शक्नोमि वा?',

@@ -147,7 +147,7 @@ def plan_research(
         response = httpx.post(
             GROQ_API_URL,
             headers={
-                "Authorization": f"******",
+                "Authorization": f"Bearer {GROQ_API_KEY}",
                 "Content-Type": "application/json",
             },
             json={

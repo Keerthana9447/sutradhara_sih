@@ -16,6 +16,13 @@ from typing import List, Dict, Any, Optional
 logger = logging.getLogger("ip_sakti.graph")
 
 
+def _neo4j_credentials():
+    uri = os.environ.get("NEO4J_URI")
+    user = os.environ.get("NEO4J_USERNAME") or os.environ.get("NEO4J_USER") or "neo4j"
+    password = os.environ.get("NEO4J_PASSWORD")
+    return uri, user, password
+
+
 def _edge(
     source: str,
     target: str,
@@ -56,9 +63,7 @@ def _query_neo4j_graph(query: str, category: str, jurisdiction_name: str) -> Opt
         return None
     if not _NEO4J_AVAILABLE:
         return None
-    uri = os.environ.get("NEO4J_URI")
-    user = os.environ.get("NEO4J_USER", "neo4j")
-    password = os.environ.get("NEO4J_PASSWORD")
+    uri, user, password = _neo4j_credentials()
 
     if not uri or not password:
         return None

@@ -623,7 +623,9 @@ def log_processing_activity(purpose: str, data_categories: List[str], legal_basi
 
 def list_processing_activities() -> List[Dict[str, Any]]:
     conn = db.get_conn()
-    rows = conn.execute("SELECT * FROM processing_register ORDER BY created_at DESC").fetchall()
+    rows = conn.execute(
+        "SELECT * FROM processing_register ORDER BY created_at DESC, entry_id DESC"
+    ).fetchall()
     conn.close()
     out = []
     for row in rows:
